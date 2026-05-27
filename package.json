@@ -1,0 +1,28 @@
+{
+  "name": "rundit-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that proxies the @rundit-sdk/client npm package.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "codegen": "node scripts/generate-tools.mjs",
+    "codegen:check": "node scripts/generate-tools.mjs --check",
+    "build": "npm run codegen && tsc -p tsconfig.json",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@nestjs/common": "^11.1.24",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.24",
+    "@rundit-sdk/client": "^0.3.0-rc.11",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^6.0.3"
+  }
+}
