@@ -34,7 +34,7 @@ for input/output type details.
 
 ## Quick start
 
-**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) running locally, and a personal Rundit API key (`rdt_ten_…`) from [your account settings.](https://app.rundit.com/#/investor/settings/security)
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) running locally, and a personal Rundit API key (`rdt_ten_…`) from [your account privacy and security settings.](https://app.rundit.com/#/investor/settings/security)
 
 ### 1. Clone and build the image
 
