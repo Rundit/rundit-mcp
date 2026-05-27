@@ -34,9 +34,13 @@ for input/output type details.
 
 ## Quick start
 
-### 1. Build the image
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) running locally, and a personal Rundit API key (`rdt_ten_…`) from [your account settings.](https://app.rundit.com/#/investor/settings/security)
+
+### 1. Clone and build the image
 
 ```bash
+git clone https://github.com/Rundit/rundit-mcp.git
+cd rundit-mcp
 docker build -t rundit-mcp .
 ```
 
