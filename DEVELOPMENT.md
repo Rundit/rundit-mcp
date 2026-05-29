@@ -2,7 +2,7 @@
 
 ## Architecture
 
-`rundit-mcp` is a NestJS process that registers every `@rundit-sdk/client` method as an MCP tool over stdio. The tool list is **generated from the SDK's `openapi.json` at build time**.
+`rundit-mcp` is a NestJS process that registers every `@rundit-sdk/client` method as an MCP tool over stdio. The tool list is **generated from the SDK's `openapi.json`** — at container start in production, and via `npm run build` locally.
 
 ```
 @rundit-sdk/client (openapi.json)
@@ -13,6 +13,10 @@ src/generated/tools.ts
         v  npm run build
 dist/main.js  ──stdin/stdout──>  MCP client (Claude Code)
 ```
+
+**In Docker**, the entrypoint runs `npm install @rundit-sdk/client@$RUNDIT_SDK_DIST_TAG` (defaults to `latest`), then `npm run build` (codegen + `tsc`), then `node dist/main.js`. This means each MCP session boot pulls the freshest SDK from npm without an image rebuild. Stale SDK ↔ src drift now surfaces at startup as a `tsc` error instead of silently in a stale image. See [`scripts/docker-entrypoint.sh`](scripts/docker-entrypoint.sh).
+
+**Locally**, `build-local.sh` symlinks the SDK from `../rundit-back/sdk-packages/client`, regenerates `tools.ts`, and compiles — see the iteration workflow below.
 
 Key files:
 
@@ -101,12 +105,37 @@ npm run build:local -- --skip-install     # regen tools + tsc only — symlink k
 ```bash
 docker build -t rundit-mcp .
 
+# Prod (latest published SDK, prod API):
 claude mcp add rundit \
   -- docker run -i --rm \
        -e RUNDIT_API_KEY=rdt_ten_your_key \
+       rundit-mcp
+
+# Test stream (rc SDK, test API):
+claude mcp add rundit-test \
+  -- docker run -i --rm \
+       -e RUNDIT_API_KEY=rdt_ten_your_test_key \
        -e RUNDIT_BASE_URL=https://test.rundit.com/api/v2/sdk \
+       -e RUNDIT_SDK_DIST_TAG=rc \
        rundit-mcp
 ```
+
+The image bakes only `rundit-mcp` source and its own deps. The SDK is installed
+fresh on every container start via [`scripts/docker-entrypoint.sh`](scripts/docker-entrypoint.sh),
+which runs:
+
+```sh
+npm install --no-save --include=dev @rundit-sdk/client@$RUNDIT_SDK_DIST_TAG
+npm run build      # codegen + tsc
+exec node dist/main.js
+```
+
+Two consequences:
+- New SDK releases are picked up on the next session restart — no rebuild, no
+  re-registration.
+- The container needs outbound access to the npm registry at start. Sessions
+  in offline/restricted environments need a different strategy (pin the SDK in
+  the image, or pre-populate an npm cache).
 
 ### Run without Docker
 
