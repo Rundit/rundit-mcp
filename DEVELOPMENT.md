@@ -26,38 +26,73 @@ Key files:
 
 ## Local Development
 
-### 1. Build the SDK client from your local backend
+There are two workflows. Use **Initial bootstrap** once per checkout; **Iteration** is what you'll run on every backend change after that.
+
+| npm script | What it does |
+|------------|--------------|
+| `npm run build:local` | Symlinks the local SDK into `node_modules`, regenerates `tools.ts`, runs `tsc` |
+| `npm run register:local` | Registers `rundit-local` with Claude Code (idempotent; prompts for API key) |
+| `npm run register:local:show` | Shows the current registration |
+| `npm run register:local:remove` | Unregisters |
+
+Each wraps the matching shell script in `scripts/`. Pass underlying-script flags after `--` (e.g. `npm run build:local -- --regen-sdk`).
+
+### Initial bootstrap (run once per checkout)
+
+Prerequisites: `rundit-back` checked out as a sibling at `../rundit-back`; the `claude` CLI on `PATH`; your local backend reachable on port 3000 (or pass `--port=<n>` in step 3).
 
 ```bash
-cd ../rundit-back
+# 1. Install MCP deps.
+npm install
+
+# 2. Build the SDK in rundit-back, symlink it into rundit-mcp/node_modules,
+#    regen tools.ts, compile dist/main.js — all in one call.
+npm run build:local -- --regen-sdk
+
+# 3. Register the MCP server with Claude Code. Prompts for API key; press
+#    Enter to accept the redacted default test key shown in the prompt.
+npm run register:local
+
+# 4. Restart Claude Code. Tools appear as mcp__rundit-local__*.
+```
+
+After step 2, `node_modules/@rundit-sdk/client` is a **symlink** to `rundit-back/sdk-packages/client`. That's load-bearing — it's what lets the iteration workflow below skip reinstall. Verify with `ls -la node_modules/@rundit-sdk/client`: the entry should start with `l` (symlink), not `d` (copy). If it's a copy, rerun `npm run build:local` to repair.
+
+### Iteration workflow (every API change after bootstrap)
+
+```bash
+# 1. Regen the SDK + tools.ts + dist in one call.
+npm run build:local -- --regen-sdk
+
+# 2. Restart Claude Code so it re-spawns the MCP subprocess with the new dist/main.js.
+```
+
+That's it. The symlink means `sdk:generate` writes straight through to `node_modules/@rundit-sdk/client/openapi.json`, the codegen reads it, `tsc` compiles, the restarted MCP loads the new `dist/main.js`. Your backend must be up on the configured port at tool-call time.
+
+Splitting the steps (e.g. if you're already in `rundit-back`):
+
+```bash
+# In rundit-back:
 npm run sdk:generate
+
+# In rundit-mcp:
+npm run build:local -- --skip-install     # regen tools + tsc only — symlink keeps openapi.json fresh
+# restart Claude Code
 ```
 
-### 2. Register the local MCP server
+### Less common cases
 
-```bash
-./scripts/setup-local.sh
-```
+- **I only changed MCP code (not the SDK):** `npm run build:local -- --skip-install` → restart Claude Code.
+- **I want to change the registration (port, API key, name):** `npm run register:local -- --port=4000` (or `--api-key=…`, `--name=…`) → restart Claude Code. No rebuild needed.
+- **I want to point at a different SDK location:** `npm run build:local -- --sdk-path=<path>`.
+- **I want to unlink the local SDK:** `npm run build:local -- --remove`.
 
-This links the local SDK, regenerates tools, builds, and registers `rundit-local` pointing to `localhost:3000`.
+### Troubleshooting
 
-```bash
-./scripts/setup-local.sh --port=4000          # custom backend port
-./scripts/setup-local.sh --api-key=rdt_xxx    # custom API key
-./scripts/setup-local.sh --remove             # unregister
-```
-
-### 3. Restart Claude Code
-
-Tools appear as `mcp__rundit-local__*`.
-
-### Iteration loop
-
-```
-Edit controllers/DTOs  →  npm run sdk:generate (rundit-back)
-                       →  ./scripts/setup-local.sh (rundit-mcp)
-                       →  Restart Claude Code
-```
+- **A tool that should exist is missing from `tools.ts`.** The SDK in `node_modules` is stale. Confirm `node_modules/@rundit-sdk/client` is a symlink (`ls -la`); if it's a copy, run `npm run build:local` to repair. Then rerun the iteration workflow.
+- **`dist/main.js not found` when registering.** Run `npm run build:local` first.
+- **Claude Code can't reach the MCP server.** Run `npm run register:local:show`; verify `RUNDIT_BASE_URL` and that your backend is up on that port.
+- **Tool calls return 401/403.** The registered API key doesn't match an active key for the backend. Re-register with `npm run register:local -- --api-key=<correct_key>`.
 
 ## Production (Docker)
 

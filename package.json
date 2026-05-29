@@ -8,6 +8,10 @@
     "codegen": "node scripts/generate-tools.mjs",
     "codegen:check": "node scripts/generate-tools.mjs --check",
     "build": "npm run codegen && tsc -p tsconfig.json",
+    "build:local": "./scripts/build-local.sh",
+    "register:local": "./scripts/register-mcp.sh",
+    "register:local:remove": "./scripts/register-mcp.sh --remove",
+    "register:local:show": "./scripts/register-mcp.sh --show",
     "start": "node dist/main.js"
   },
   "dependencies": {
@@ -16,7 +20,7 @@
     "@nestjs/common": "^11.1.24",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.24",
-    "@rundit-sdk/client": "^0.2.1-rc.20",
+    "@rundit-sdk/client": "file:../rundit-back/sdk-packages/client",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.25.0"
