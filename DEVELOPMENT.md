@@ -2,108 +2,106 @@
 
 ## Architecture
 
-`rundit-mcp` is a NestJS process that registers every method on
-`@rundit-sdk/client` as an MCP tool and speaks the stdio transport. The tool
-list is **generated from the SDK's `openapi.json` at build time**, so updating
-the SDK is the only step needed when new endpoints are added.
+`rundit-mcp` is a NestJS process that registers every `@rundit-sdk/client` method as an MCP tool over stdio. The tool list is **generated from the SDK's `openapi.json` at build time**.
+
+```
+@rundit-sdk/client (openapi.json)
+        |
+        v  npm run codegen
+src/generated/tools.ts
+        |
+        v  npm run build
+dist/main.js  ──stdin/stdout──>  MCP client (Claude Code)
+```
 
 Key files:
 
-- [src/main.ts](src/main.ts) — Nest bootstrap + stdio transport
-- [src/rundit/rundit.service.ts](src/rundit/rundit.service.ts) — constructs the
-  `@rundit-sdk/client` instance from env vars
-- [src/rundit/rundit-tools.service.ts](src/rundit/rundit-tools.service.ts) —
-  iterates `TOOLS` and registers each one with the MCP server
-- [src/rundit/json-schema-to-zod.ts](src/rundit/json-schema-to-zod.ts) —
-  converts the generated JSON-Schema input definitions to Zod shapes at runtime
-- [src/generated/tools.ts](src/generated/tools.ts) — **generated**, do not
-  edit by hand
-- [scripts/generate-tools.mjs](scripts/generate-tools.mjs) — the generator
+| File | Purpose |
+|------|---------|
+| `src/generated/tools.ts` | **Generated** — one `ToolSpec` per SDK operation |
+| `scripts/generate-tools.mjs` | Reads `openapi.json`, writes `tools.ts` |
+| `src/rundit/rundit.service.ts` | Creates the SDK client from env vars |
+| `src/rundit/rundit-tools.service.ts` | Registers tools with the MCP server |
+| `src/rundit/json-schema-to-zod.ts` | Converts JSON Schema inputs to Zod at runtime |
 
-## Codegen
+## Local Development
 
-`scripts/generate-tools.mjs` reads
-`node_modules/@rundit-sdk/client/openapi.json` and rewrites
-`src/generated/tools.ts` — one `ToolSpec` per SDK operation, with a
-JSON-Schema input and an `invoke` thunk that calls the corresponding method on
-`RunditClient`.
-
-The generated file is committed so SDK upgrades show up as a reviewable diff.
-
-| Command                  | Effect                                                                                  |
-|--------------------------|-----------------------------------------------------------------------------------------|
-| `npm run codegen`        | Regenerates `src/generated/tools.ts` from the installed SDK.                            |
-| `npm run codegen:check`  | Exits non-zero if the committed file differs from what the installed SDK would produce. |
-| `npm run build`          | Runs `codegen` then `tsc`. Docker's build stage runs the same script.                   |
-
-Because `npm run build` re-runs codegen, the Docker image is always built
-against the SDK version pinned in `package-lock.json` — there's no way to
-ship a stale tool list as long as the lockfile is honored.
-
-## Keeping tools in sync with SDK releases
-
-1. Add `@rundit-sdk/client` to your dependency-update bot (Renovate /
-   Dependabot). Example Renovate rule:
-
-   ```json
-   {
-     "packageRules": [
-       { "matchPackageNames": ["@rundit-sdk/client"], "groupName": "rundit sdk" }
-     ]
-   }
-   ```
-
-2. In CI, after `npm ci`, run:
-
-   ```bash
-   npm run codegen:check
-   ```
-
-   Or, equivalently:
-
-   ```bash
-   npm run codegen
-   git diff --exit-code src/generated/tools.ts \
-     || (echo "::error::Run 'npm run codegen' and commit" && exit 1)
-   ```
-
-3. When the bot opens an SDK-bump PR, push a follow-up commit regenerating
-   tools (or have CI auto-commit). A green CI signals the new tool surface is
-   wired up and ready to ship.
-
-## Wire into your MCP client and test against test env
-
-**Claude Code (CLI):**
+### 1. Build the SDK client from your local backend
 
 ```bash
+cd ../rundit-back
+npm run sdk:generate
+```
+
+### 2. Register the local MCP server
+
+```bash
+./scripts/setup-local.sh
+```
+
+This links the local SDK, regenerates tools, builds, and registers `rundit-local` pointing to `localhost:3000`.
+
+```bash
+./scripts/setup-local.sh --port=4000          # custom backend port
+./scripts/setup-local.sh --api-key=rdt_xxx    # custom API key
+./scripts/setup-local.sh --remove             # unregister
+```
+
+### 3. Restart Claude Code
+
+Tools appear as `mcp__rundit-local__*`.
+
+### Iteration loop
+
+```
+Edit controllers/DTOs  →  npm run sdk:generate (rundit-back)
+                       →  ./scripts/setup-local.sh (rundit-mcp)
+                       →  Restart Claude Code
+```
+
+## Production (Docker)
+
+### Build and register
+
+```bash
+docker build -t rundit-mcp .
+
 claude mcp add rundit \
-  --scope user \
   -- docker run -i --rm \
        -e RUNDIT_API_KEY=rdt_ten_your_key \
        -e RUNDIT_BASE_URL=https://test.rundit.com/api/v2/sdk \
        rundit-mcp
 ```
 
-## Run without Docker
+### Run without Docker
 
 ```bash
-npm install
-npm run build
+npm install && npm run build
 
 RUNDIT_API_KEY=rdt_ten_your_key \
 RUNDIT_BASE_URL=https://test.rundit.com/api/v2/sdk \
 npm start
 ```
 
-The process reads MCP JSON-RPC from stdin and writes responses to stdout. For
-interactive testing, use the
-[MCP Inspector](https://github.com/modelcontextprotocol/inspector).
+## Codegen
 
+| Command | Effect |
+|---------|--------|
+| `npm run codegen` | Regenerates `tools.ts` from installed SDK |
+| `npm run codegen:check` | Exits non-zero if `tools.ts` is stale |
+| `npm run build` | Runs codegen + `tsc` |
+
+The generated file is committed so SDK upgrades show as a reviewable diff.
+
+## CI
+
+After `npm ci`, verify tools are in sync:
+
+```bash
+npm run codegen:check
+```
 
 ## Smoke test
-
-Send `initialize` + `tools/list` to the running container and verify all 12
-tools come back:
 
 ```bash
 printf '%s\n%s\n' \
@@ -112,4 +110,4 @@ printf '%s\n%s\n' \
 | docker run -i --rm -e RUNDIT_API_KEY=rdt_ten_dummy rundit-mcp
 ```
 
-Stderr will print `[rundit-mcp] registering N tools from @rundit-sdk/client vX.Y.Z`.
+Stderr prints `[rundit-mcp] registering N tools from @rundit-sdk/client vX.Y.Z`.
