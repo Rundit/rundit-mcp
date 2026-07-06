@@ -4,12 +4,11 @@ An [MCP](https://modelcontextprotocol.io) server (Docker, stdio) that exposes th
 
 ## Quick start
 
-**You need:** [Docker](https://docs.docker.com/get-docker/) running, and a Rundit
-API key (`rdt_ten_…`) from your
+**You need:** [Docker](https://docs.docker.com/get-docker/) running, [git client](https://git-scm.com/install) and a Rundit API key (`rdt_ten_…`) from your
 [account privacy & security settings](https://app.rundit.com/#/investor/settings/security).
 
 **1. Build the image** — only needed when rundit-mcp itself changes; SDK updates
-are picked up automatically on each start.
+are picked up automatically on each start. Open command line and run the following command:
 
 ```bash
 git clone https://github.com/Rundit/rundit-mcp.git && cd rundit-mcp
