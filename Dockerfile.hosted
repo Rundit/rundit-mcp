@@ -2,15 +2,17 @@
 
 # Hosted-MCP image (cloud66). Unlike ./Dockerfile — which strips
 # @rundit-sdk/client and reinstalls it at a dist-tag on every container start —
-# this image bakes the SDK at build time: the version pinned in
-# package-lock.json, or a dist-tag/version passed as a build arg. The result is
-# an immutable image with instant cold start and no npm egress at runtime; SDK
-# updates ship as a version-bump commit (or an rc-tag build) plus a redeploy.
+# this image bakes the SDK at build time: the dist-tag/version passed as a
+# build arg (Cloud 66 stacks set RUNDIT_SDK_VERSION — test: rc, prod: latest),
+# or the version pinned in package-lock.json when the arg is empty. The result
+# is an immutable image with instant cold start and no npm egress at runtime;
+# SDK releases redeploy automatically — rundit-sdk's publish workflow calls the
+# stack's Cloud 66 redeployment hook, and the rebuild bakes the fresh tag.
 
 FROM node:24-alpine
 WORKDIR /app
 
-# Optional override for the test/staging stream, e.g. --build-arg RUNDIT_SDK_VERSION=rc.
+# Dist-tag or version to bake, e.g. --build-arg RUNDIT_SDK_VERSION=rc.
 # Empty (the default) keeps the exact version from package-lock.json.
 ARG RUNDIT_SDK_VERSION=
 

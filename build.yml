@@ -3,9 +3,11 @@
 # Dockerfile ARG — service.yml has no build-args support.
 #
 # _env(RUNDIT_SDK_VERSION) resolves from the stack's environment at build
-# time. Unset (production) it becomes an empty string, so Dockerfile.hosted
-# falls back to the exact SDK version pinned in package-lock.json. Set
-# RUNDIT_SDK_VERSION=rc on the test stack to track the rc dist-tag instead.
+# time. Each stack tracks an npm dist-tag: RUNDIT_SDK_VERSION=rc on the test
+# stack, =latest on the production stack — rundit-sdk's publish workflow hits
+# the stack's redeployment hook after each publish, and the rebuild bakes the
+# fresh tag. Unset (builds outside Cloud 66) it becomes an empty string, so
+# Dockerfile.hosted falls back to the exact SDK version in package-lock.json.
 build:
   version: 2016-03-14
   steps:
