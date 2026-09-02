@@ -1,0 +1,16 @@
+# Habitus build file, processed by Cloud 66 (BuildGrid) when building the
+# hosted MCP image. It exists to pass RUNDIT_SDK_VERSION through to the
+# Dockerfile ARG — service.yml has no build-args support.
+#
+# _env(RUNDIT_SDK_VERSION) resolves from the stack's environment at build
+# time. Unset (production) it becomes an empty string, so Dockerfile.hosted
+# falls back to the exact SDK version pinned in package-lock.json. Set
+# RUNDIT_SDK_VERSION=rc on the test stack to track the rc dist-tag instead.
+build:
+  version: 2016-03-14
+  steps:
+    mcp:
+      name: mcp
+      dockerfile: Dockerfile.hosted
+      args:
+        RUNDIT_SDK_VERSION: _env(RUNDIT_SDK_VERSION)
