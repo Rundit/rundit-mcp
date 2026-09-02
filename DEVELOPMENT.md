@@ -138,6 +138,35 @@ Two consequences:
   in offline/restricted environments need a different strategy (pin the SDK in
   the image, or pre-populate an npm cache).
 
+### Hosted deployment sync (Cloud 66)
+
+The hosted image ([`Dockerfile.hosted`](Dockerfile.hosted), built by Cloud 66
+BuildGrid via [`build.yml`](build.yml)) bakes the SDK at image-build time from
+the dist-tag in the stack's `RUNDIT_SDK_VERSION` environment variable — `rc`
+on the test stack, `latest` on the production stack. Builds without the arg
+(local `docker build`) fall back to the exact version in `package-lock.json`.
+
+Deployments follow SDK releases automatically: after every publish,
+`rundit-sdk`'s publish workflow waits for npm to serve the new version on the
+channel's dist-tag, then calls the matching stack's Cloud 66 redeployment
+hook — `rc` publish → test stack, `latest` publish → prod stack. The rebuild
+installs the fresh tag; no commit in this repo is involved. A failed or
+skipped redeploy is recovered by re-running the publish workflow run, or by
+hitting the stack's redeploy hook manually.
+
+Required configuration (in the **rundit-sdk** repo's secrets):
+`CLOUD66_MCP_REDEPLOY_HOOK_TEST` and `CLOUD66_MCP_REDEPLOY_HOOK_PROD` — each
+stack's redeployment hook URL from its Cloud 66 stack page.
+
+Consequences of tracking dist-tags:
+- The `@rundit-sdk/client` pin in `package.json`/`package-lock.json` and the
+  committed `tools.ts` describe local development, not what production runs —
+  bump them periodically so review diffs stay meaningful.
+- Any Cloud 66 rebuild (e.g. a config redeploy) picks up whatever the tag
+  points at at that moment.
+- The deploy gate for a new SDK is the image build itself (codegen + `tsc`);
+  the vitest suite only runs in this repo's CI against the pinned version.
+
 ### Run without Docker
 
 ```bash
