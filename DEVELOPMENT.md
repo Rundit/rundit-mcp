@@ -160,10 +160,14 @@ The generated file is committed so SDK upgrades show as a reviewable diff.
 
 ## CI
 
-After `npm ci`, verify tools are in sync:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes to `main`
+and on every PR: `npm ci` → `codegen:check` (committed `tools.ts` matches the
+installed SDK) → `lint` ([oxlint](https://oxc.rs/docs/guide/usage/linter)) →
+`build` (codegen + `tsc`) → `test` ([vitest](https://vitest.dev), specs in
+`test/`). Run the same locally:
 
 ```bash
-npm run codegen:check
+npm run codegen:check && npm run lint && npm run build && npm test
 ```
 
 ## Smoke test

@@ -12,6 +12,8 @@
     "register:local": "./scripts/register-mcp.sh",
     "register:local:remove": "./scripts/register-mcp.sh --remove",
     "register:local:show": "./scripts/register-mcp.sh --show",
+    "lint": "oxlint src scripts test",
+    "test": "vitest run",
     "start": "node dist/main.js"
   },
   "dependencies": {
@@ -27,6 +29,8 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "typescript": "^6.0.3"
+    "oxlint": "^1.81.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   }
 }

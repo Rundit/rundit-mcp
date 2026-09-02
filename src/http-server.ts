@@ -126,11 +126,16 @@ async function handleRequest(
     body = await readJsonBody(req);
   } catch (err) {
     if (err instanceof BodyTooLargeError) {
-      // Refuse immediately and drop the connection once the response is
-      // flushed, so an oversized or slow upload can't keep the socket busy.
+      // Refuse immediately, then drain (not buffer) the rest of the upload so
+      // the client can read the 413 — destroying outright can RST the socket
+      // before the response is delivered. A timer bounds how long a
+      // never-ending upload may occupy the connection.
       res.setHeader('Connection', 'close');
-      res.once('finish', () => req.destroy());
       sendJson(res, 413, jsonRpcError(-32000, err.message));
+      req.resume();
+      const drainDeadline = setTimeout(() => req.destroy(), 10_000);
+      drainDeadline.unref();
+      req.once('close', () => clearTimeout(drainDeadline));
     } else {
       sendJson(res, 400, jsonRpcError(-32700, 'Request body is not valid JSON'));
     }
