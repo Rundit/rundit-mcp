@@ -86,6 +86,18 @@ async function handleRequest(
     sendJson(res, 403, jsonRpcError(-32000, 'Forbidden: origin not allowed'));
     return;
   }
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Methods': 'POST',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-API-Key',
+    });
+    res.end();
+    return;
+  }
 
   // Stateless mode has no SSE channel and no sessions, so GET and DELETE
   // (which serve those in stateful deployments) have nothing to do.
