@@ -47,21 +47,54 @@ That's it. Everything below is reference.
 
 ## Configuration
 
-| Env var               | Required | Default                             | Notes                                                                                              |
-|-----------------------|----------|-------------------------------------|----------------------------------------------------------------------------------------------------|
-| `RUNDIT_API_KEY`      | yes      | —                                   | Personal Rundit API key (`rdt_ten_…`).                                                             |
-| `RUNDIT_BASE_URL`     | no       | `https://api.rundit.com/api/v2/sdk` | Set to `https://test.rundit.com/api/v2/sdk` for the test environment.                              |
-| `RUNDIT_SDK_DIST_TAG` | no       | `latest`                            | npm dist-tag for `@rundit-sdk/client`, installed fresh each start. Use `rc` to track test/staging. |
+| Env var               | Required   | Default                             | Notes                                                                                              |
+|-----------------------|------------|-------------------------------------|----------------------------------------------------------------------------------------------------|
+| `RUNDIT_API_KEY`      | stdio mode | —                                   | Personal Rundit API key (`rdt_ten_…`). Unused in http mode — callers send their own key per request. |
+| `RUNDIT_BASE_URL`     | no         | `https://api.rundit.com/api/v2/sdk` | Set to `https://test.rundit.com/api/v2/sdk` for the test environment.                              |
+| `RUNDIT_SDK_DIST_TAG` | no         | `latest`                            | npm dist-tag for `@rundit-sdk/client`, installed fresh each start. Use `rc` to track test/staging. |
+| `MCP_TRANSPORT`       | no         | `stdio`                             | `http` serves MCP over stateless Streamable HTTP instead of stdio (see below).                     |
+| `PORT`                | no         | `3001`                              | Listen port in http mode.                                                                          |
 
 To target the test stream, pass both `RUNDIT_SDK_DIST_TAG=rc` and the test
 `RUNDIT_BASE_URL`.
+
+## HTTP mode (remote server)
+
+With `MCP_TRANSPORT=http` the same process serves MCP over stateless
+[Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http):
+`POST /mcp` handles every MCP message, `GET /health` reports liveness. Each
+request must carry a Rundit API key — as `Authorization: Bearer rdt_ten_…` or
+`X-API-Key: rdt_ten_…` — which is forwarded to the Rundit API on every tool
+call and authenticated there. The server stores nothing: no keys, no sessions,
+no per-tenant state.
+
+Register with Claude Code:
+
+```bash
+claude mcp add --transport http rundit https://your-rundit-host/mcp \
+  --header "Authorization: Bearer rdt_ten_your_key"
+```
+
+Or in `.mcp.json` (env expansion keeps the key out of the file):
+
+```json
+{
+  "mcpServers": {
+    "rundit": {
+      "type": "http",
+      "url": "https://your-rundit-host/mcp",
+      "headers": { "Authorization": "Bearer ${RUNDIT_API_KEY}" }
+    }
+  }
+}
+```
 
 ## Tools
 
 One MCP tool per SDK operation, generated from the SDK's `openapi.json` at
 container start — so the set always matches your installed SDK version. They
 cover companies, funds (company groups), positions, transactions, metrics, and
-reports. For the live list, run `/mcp` or read the startup line `registering N
+reports. For the live list, run `/mcp` or read the startup line `prepared N
 tools from @rundit-sdk/client vX.Y.Z`; see the
 [`@rundit-sdk/client` README](https://www.npmjs.com/package/@rundit-sdk/client)
 for each tool's inputs and outputs.

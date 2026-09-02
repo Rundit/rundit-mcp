@@ -1,10 +1,10 @@
 // AUTO-GENERATED FILE — DO NOT EDIT.
 // Regenerate with: npm run codegen
-// Source: @rundit-sdk/client v0.2.0 (openapi.json)
+// Source: @rundit-sdk/client v0.3.3 (openapi.json)
 
 import type { RunditClient } from '@rundit-sdk/client';
 
-export const SDK_VERSION = "0.2.0";
+export const SDK_VERSION = "0.3.3";
 
 export interface ToolSpec {
   name: string;
@@ -99,7 +99,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "companies_get_dashboards",
-    description: "PREFERRED tool for multi-company analysis — full dashboards for many companies in one call\n\nPREFERRED tool for multi-company analysis. Returns full dashboards (company metadata, positions, metrics with data points, recent transactions, report summaries) for many companies in a single request, grouped per company. Use this instead of looping `GET /companies/:id/dashboard` (the N+1 pattern) whenever the agent needs to look at more than one company — it returns the same shape per company but in one round trip. Typical workflow: resolve company ids (e.g. `GET /companies?nameSearch=[\"acme\",\"beta\"]`), then call this with their `companyIds`. Use `metricTypeIds` or `metricTypeNames` to scope the returned metrics, `metricsTimeframe` to restrict data point granularity, `currency` (ISO 4217) to FX-convert monetary metrics across the batch, and `transactionLimit` / `reportLimit` to cap list sizes per company.",
+    description: "PREFERRED tool for multi-company analysis — full dashboards for many companies in one call\n\nPREFERRED tool for multi-company analysis. Returns full dashboards (company metadata, positions, metrics with data points, recent transactions, report summaries) for many companies in a single request, grouped per company. Use this instead of looping `GET /companies/:id/dashboard` (the N+1 pattern) whenever the agent needs to look at more than one company — it returns the same shape per company but in one round trip. Typical workflow: resolve company ids (e.g. `GET /companies?nameSearch=[\"acme\",\"beta\"]`), then call this with their `companyIds`. Use `metricTypeIds` or `metricTypeNames` to scope the returned metrics. `metricsFrom` (ISO 8601) sets a lower-bound date for metric data points; omit to include all history. `metricsTimeframe` restricts data point granularity to Month, Quarter, or Year. `currency` (ISO 4217, required) FX-converts all monetary metrics across the batch. `conversionStrategy` controls which rate is applied: `LATEST_FX_RATE` (default) or `ENTITY_DATE_RATE` (the rate on each point's own date). `transactionLimit` / `reportLimit` cap list sizes per company (defaults: 10 and 5 respectively).",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -170,7 +170,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "companies_get_one",
-    description: "Get one company available to the SDK consumer",
+    description: "Get one company available to the SDK consumer\n\nReturns the full company object for a single company. Includes all compact-list fields (id, name, type, currency, website, logo) plus extended metadata: legal name, status, description, vision, address, city, state, country, operating countries, VAT number, founding year, established date, total funding, and accessible fund ids (as `companyGroupIds`). Returns 404 if the company does not exist or is inaccessible to the caller.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -188,7 +188,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "company_groups_get_all",
-    description: "List company groups available to the SDK consumer\n\nReturns compact company group metadata (id, name, demo flag, color, member company ids). Filter by `companyGroupIds` and/or `nameSearch` (case-insensitive substring on name; accepts an array to resolve multiple groups in one call with OR semantics — e.g. `nameSearch=[\"fund i\",\"fund ii\"]`).",
+    description: "List funds available to the SDK consumer\n\nReturns compact fund metadata (id, name, demo flag, color, member company ids). Filter by `companyGroupIds` and/or `nameSearch` (case-insensitive substring on name; accepts an array to resolve multiple groups in one call with OR semantics — e.g. `nameSearch=[\"fund i\",\"fund ii\"]`).",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -221,7 +221,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "company_groups_get_one",
-    description: "Get one company group available to the SDK consumer",
+    description: "Get one fund available to the SDK consumer\n\nReturns full fund details. Includes all compact-list fields (id, name, type, currency, logo) plus extended fund metadata: legal name, domicile, management company, GP, vintage year, fund currency, opening and closing dates, legal form, investment policy, fees, regulatory info, and service providers. Also includes the list of member companies the caller can access. Returns 404 if the fund does not exist or is inaccessible to the caller.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -257,7 +257,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "company_reports_list",
-    description: "List published company reports accessible to the caller (metadata only)\n\nReturns lightweight report metadata (id, title, period, publisher company reference). Use GET /company-reports/:id to fetch the full content of a specific report. Visibility is determined by the caller's roles — VC users see reports for managed-portfolio companies, company employees see their own company's reports, portfolio investors see Published reports shared with their visibility groups. Filters narrow the list by company ids, company groups, company name substring (`companyNameSearch`), and reporting period (timeframe + date range).",
+    description: "List published company reports accessible to the caller (metadata only)\n\nReturns lightweight report metadata (id, title, period, publisher company reference). Use GET /company-reports/:id to fetch the full content of a specific report. Visibility is determined by the caller's roles — VC users see reports for managed-portfolio companies, company employees see their own company's reports, portfolio investors see Published reports shared with their visibility groups. Filters narrow the list by company ids, funds (`companyGroupIds`), company name substring (`companyNameSearch`), and reporting period (timeframe + date range).",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -314,7 +314,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "metrics_aggregate",
-    description: "Aggregate metrics across portfolio companies\n\nReturns aggregated metric values (SUM, AVG, MEDIAN, MIN, MAX, COUNT) across companies for each reporting period. Optionally group results by company group for fund-level breakdowns.",
+    description: "Aggregate metrics across portfolio companies\n\nReturns aggregated metric values (SUM, AVG, MEDIAN, MIN, MAX, COUNT) across companies for each reporting period. Pass `metricTypeIds` (resolve from /metrics/types) to select what to aggregate; names are not accepted on this endpoint to keep selection stable. Optionally group results by fund (`companyGroupId`) for fund-level breakdowns. MIN, MAX, and COUNT are always computed. SUM, AVG, and MEDIAN are only produced when the metric type enables them in its `summaryAggregationMethods` configuration; otherwise `point.value` is `null` for that aggregation.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -326,15 +326,15 @@ export const TOOLS: ToolSpec[] = [
           "type": "string",
           "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
         },
-        "metricTypeNames": {
-          "description": "Metric type names to aggregate (case-insensitive exact match).",
+        "metricTypeIds": {
+          "description": "Metric type identifiers to aggregate. Resolve names to ids via /metrics/types.",
           "example": [
-            "MRR - Monthly Recurring Revenue",
-            "Headcount / Employees / Personnel"
+            1,
+            7
           ],
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "number"
           }
         },
         "aggregation": {
@@ -399,7 +399,7 @@ export const TOOLS: ToolSpec[] = [
         }
       },
       "required": [
-        "metricTypeNames",
+        "metricTypeIds",
         "aggregation"
       ],
       "additionalProperties": false
@@ -408,7 +408,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "metrics_compare",
-    description: "Compare metrics across companies\n\nReturns date-aligned rows for one or more metric types across multiple companies. Pass `metricTypeIds` (array of ids) or `metricTypeNames` (array of names) to compare several metrics in a single round trip, or the legacy `metricTypeName` (string) for a single metric. Each row contains one value per company for a given period. Optionally includes period-over-period percentage change. Use `companyIds`, `companyNameSearch`, or `companyGroupIds` to select companies.",
+    description: "Compare metrics across companies\n\nReturns date-aligned rows for one or more metric types across multiple companies. Pass `metricTypeIds` (resolve from /metrics/types) to compare several metrics in a single round trip; names are not accepted on this endpoint to keep selection stable. Each row contains one value per company for a given period. Optionally includes period-over-period percentage change. Use `companyIds`, `companyNameSearch`, or `companyGroupIds` to select companies.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -421,27 +421,15 @@ export const TOOLS: ToolSpec[] = [
           "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
         },
         "metricTypeIds": {
-          "description": "Restrict to specific metric types by id (use GET /metrics/types to discover identifiers). When multiple ids are provided, the response contains one entry per metric type.",
+          "description": "Metric type identifiers to compare (resolve names to ids via /metrics/types). When multiple ids are provided, the response contains one entry per metric type.",
+          "example": [
+            1,
+            7
+          ],
           "type": "array",
           "items": {
             "type": "number"
           }
-        },
-        "metricTypeNames": {
-          "description": "Resolve metric types by case-insensitive exact match on their display name and intersect with `metricTypeIds`. Lets the agent fetch by metric name (e.g. \"Revenue\") without first listing /metrics/types.",
-          "example": [
-            "MRR - Monthly Recurring Revenue",
-            "Churn Rate (Customers, Users...)"
-          ],
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "metricTypeName": {
-          "type": "string",
-          "description": "Metric type name to compare across companies (case-insensitive exact match). Convenience shorthand — ignored when `metricTypeNames` or `metricTypeIds` is provided.",
-          "example": "MRR - Monthly Recurring Revenue"
         },
         "companyIds": {
           "description": "Restrict to these company identifiers.",
@@ -499,6 +487,9 @@ export const TOOLS: ToolSpec[] = [
           "default": false
         }
       },
+      "required": [
+        "metricTypeIds"
+      ],
       "additionalProperties": false
     },
     invoke: (client, args) => client.metrics.compare(args),
@@ -598,7 +589,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "positions_get_company_positions",
-    description: "Get positions for one company",
+    description: "Get positions for one company\n\nReturns all fund-level positions for a single company — one entry per fund (`companyGroupId`) that holds a position in the company. Each entry carries invested amount, fair market value, ownership percentage, share counts, multiple, and ROI, all FX-converted to `currency` (ISO 4217, required). Filter by `companyGroupIds` to scope to specific funds. Use `date` (ISO 8601) for a historical snapshot; omit to use the latest available data.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -640,7 +631,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "positions_get_portfolio_positions",
-    description: "Get portfolio positions",
+    description: "Get aggregated portfolio position totals\n\nReturns a single aggregated position object that sums invested amount, fair market value, ownership percentage, share counts, multiple, and ROI across all accessible companies (optionally filtered by `companyIds` and/or `companyGroupIds` to scope to specific funds). `currency` (ISO 4217, required) converts all monetary values. Use `date` (ISO 8601) for a historical snapshot; omit for the latest available data. For a per-company breakdown instead of a single aggregate, use `GET /positions/portfolio/summary`.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -727,7 +718,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "transactions_get_company_transactions",
-    description: "Get transactions for one company",
+    description: "Get transactions for one company\n\nReturns all transactions for a single company, ordered by date descending. Each transaction is a typed variant — narrow it via its `type` field. Filter by `companyGroupIds` to scope to a specific fund, `types` to limit to specific transaction kinds, and `priorTo` (ISO 8601) for a historical snapshot. Requires transaction read access on the company.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -793,7 +784,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "transactions_get_summary",
-    description: "Get transaction activity summary\n\nReturns aggregated transaction statistics: total invested, total realized, transaction count, company count, and breakdown by transaction type. Optionally group by period (Month, Quarter, Year). Filter by company, company group, and date range.",
+    description: "Get transaction activity summary\n\nReturns aggregated transaction statistics: total invested, total realized, transaction count, company count, and breakdown by transaction type. Optionally group by period (Month, Quarter, Year). Filter by company, fund (`companyGroupIds`), and date range.",
     inputSchema: {
       "type": "object",
       "properties": {
@@ -850,7 +841,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "transactions_get_transactions",
-    description: "Get transactions for multiple companies",
+    description: "Get transactions for multiple companies\n\nReturns transactions across multiple companies. Each transaction is a typed variant — narrow it via its `type` field. Filter by `companyIds`, `companyGroupIds`, `types`, and `priorTo` (ISO 8601 upper-bound date for a historical snapshot). When `companyIds` is provided, the caller must have transaction read access on every listed company.",
     inputSchema: {
       "type": "object",
       "properties": {

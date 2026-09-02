@@ -2,7 +2,7 @@
 
 ## Architecture
 
-`rundit-mcp` is a NestJS process that registers every `@rundit-sdk/client` method as an MCP tool over stdio. The tool list is **generated from the SDK's `openapi.json`** — at container start in production, and via `npm run build` locally.
+`rundit-mcp` is a NestJS process that registers every `@rundit-sdk/client` method as an MCP tool. It speaks two transports, selected by `MCP_TRANSPORT`: **stdio** (default — one process per user, key from `RUNDIT_API_KEY`) and **http** (stateless Streamable HTTP for the hosted deployment — a fresh MCP server per `POST /mcp`, bound to the API key from that request's headers; see `src/http-server.ts`). The tool list is **generated from the SDK's `openapi.json`** — at container start in production, and via `npm run build` locally.
 
 ```
 @rundit-sdk/client (openapi.json)
@@ -24,8 +24,9 @@ Key files:
 |------|---------|
 | `src/generated/tools.ts` | **Generated** — one `ToolSpec` per SDK operation |
 | `scripts/generate-tools.mjs` | Reads `openapi.json`, writes `tools.ts` |
-| `src/rundit/rundit.service.ts` | Creates the SDK client from env vars |
-| `src/rundit/rundit-tools.service.ts` | Registers tools with the MCP server |
+| `src/rundit/rundit.service.ts` | SDK-client factory (`clientFor(apiKey)`; env-key default for stdio) |
+| `src/rundit/rundit-tools.service.ts` | Precomputes tool schemas, builds MCP servers bound to a client |
+| `src/http-server.ts` | http mode: stateless Streamable HTTP endpoint, key pass-through |
 | `src/rundit/json-schema-to-zod.ts` | Converts JSON Schema inputs to Zod at runtime |
 
 ## Local Development
@@ -167,11 +168,27 @@ npm run codegen:check
 
 ## Smoke test
 
+stdio:
+
 ```bash
 printf '%s\n%s\n' \
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' \
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
 | docker run -i --rm -e RUNDIT_API_KEY=rdt_ten_dummy rundit-mcp
+```
+
+http (`MCP_TRANSPORT=http PORT=3001 npm start`, or the `Dockerfile.hosted` image):
+
+```bash
+curl http://localhost:3001/health
+# 401 without a key:
+curl -i -X POST http://localhost:3001/mcp -H 'Content-Type: application/json' -d '{}'
+# tools/list with a key (stateless — no initialize round-trip needed):
+curl -X POST http://localhost:3001/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'Authorization: Bearer rdt_ten_dummy' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
 Stderr prints `[rundit-mcp] registering N tools from @rundit-sdk/client vX.Y.Z`.
