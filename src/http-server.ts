@@ -13,6 +13,17 @@ const MCP_PATH = '/mcp';
 // the MCP SDK transport does not enforce one.
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
+// MCP Streamable HTTP servers must validate Origin to prevent DNS-rebinding.
+// MCP clients (Claude Code, claude.ai, …) send no Origin header and are
+// unaffected; browser-initiated requests carry one and are rejected unless
+// allowlisted via MCP_ALLOWED_ORIGINS (comma-separated, exact match).
+const ALLOWED_ORIGINS = new Set(
+  (process.env.MCP_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
 type HttpServerDeps = {
   port: number;
   tools: RunditToolsService;
@@ -70,6 +81,12 @@ async function handleRequest(
     return;
   }
 
+  const origin = req.headers.origin;
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    sendJson(res, 403, jsonRpcError(-32000, 'Forbidden: origin not allowed'));
+    return;
+  }
+
   // Stateless mode has no SSE channel and no sessions, so GET and DELETE
   // (which serve those in stateful deployments) have nothing to do.
   if (req.method !== 'POST') {
@@ -97,6 +114,10 @@ async function handleRequest(
     body = await readJsonBody(req);
   } catch (err) {
     if (err instanceof BodyTooLargeError) {
+      // Refuse immediately and drop the connection once the response is
+      // flushed, so an oversized or slow upload can't keep the socket busy.
+      res.setHeader('Connection', 'close');
+      res.once('finish', () => req.destroy());
       sendJson(res, 413, jsonRpcError(-32000, err.message));
     } else {
       sendJson(res, 400, jsonRpcError(-32700, 'Request body is not valid JSON'));
@@ -120,9 +141,10 @@ async function handleRequest(
 }
 
 function extractApiKey(req: IncomingMessage): string | undefined {
-  const authorization = req.headers.authorization;
-  if (authorization?.startsWith('Bearer ')) {
-    const token = authorization.slice('Bearer '.length).trim();
+  // Auth scheme names are case-insensitive (RFC 9110 §11.1).
+  const bearer = req.headers.authorization?.match(/^Bearer\s+(.+)$/i);
+  if (bearer) {
+    const token = bearer[1].trim();
     if (token) return token;
   }
   const apiKeyHeader = req.headers['x-api-key'];
@@ -134,31 +156,45 @@ class BodyTooLargeError extends Error {}
 
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    const tooLarge = new BodyTooLargeError(`Request body exceeds ${MAX_BODY_BYTES} bytes`);
+
+    const declaredLength = Number(req.headers['content-length']);
+    if (declaredLength > MAX_BODY_BYTES) {
+      reject(tooLarge);
+      return;
+    }
+
     const chunks: Buffer[] = [];
     let size = 0;
-    let tooLarge = false;
+    let settled = false;
     req.on('data', (chunk: Buffer) => {
-      if (tooLarge) return;
+      if (settled) return;
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        tooLarge = true;
+        // Reject as soon as the threshold is crossed — don't wait for the
+        // client to finish uploading. The caller closes the connection.
+        settled = true;
         chunks.length = 0;
+        req.pause();
+        reject(tooLarge);
         return;
       }
       chunks.push(chunk);
     });
     req.on('end', () => {
-      if (tooLarge) {
-        reject(new BodyTooLargeError(`Request body exceeds ${MAX_BODY_BYTES} bytes`));
-        return;
-      }
+      if (settled) return;
+      settled = true;
       try {
         resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
       } catch {
         reject(new SyntaxError('Request body is not valid JSON'));
       }
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    });
   });
 }
 

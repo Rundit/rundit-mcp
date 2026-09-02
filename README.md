@@ -54,6 +54,7 @@ That's it. Everything below is reference.
 | `RUNDIT_SDK_DIST_TAG` | no         | `latest`                            | npm dist-tag for `@rundit-sdk/client`, installed fresh each start. Use `rc` to track test/staging. |
 | `MCP_TRANSPORT`       | no         | `stdio`                             | `http` serves MCP over stateless Streamable HTTP instead of stdio (see below).                     |
 | `PORT`                | no         | `3001`                              | Listen port in http mode.                                                                          |
+| `MCP_ALLOWED_ORIGINS` | no         | — (all browser origins rejected)    | http mode: comma-separated `Origin` allowlist. MCP clients send no `Origin` and are unaffected.    |
 
 To target the test stream, pass both `RUNDIT_SDK_DIST_TAG=rc` and the test
 `RUNDIT_BASE_URL`.
