@@ -37,8 +37,8 @@ async function bootstrap() {
     closeTransport = () => mcpServer.close();
   }
 
-  const shutdown = async (signal: NodeJS.Signals) => {
-    process.stderr.write(`[rundit-mcp] received ${signal}, shutting down\n`);
+  const shutdown = async () => {
+    process.stderr.write('[rundit-mcp] received shutdown signal, shutting down\n');
     await closeTransport();
     await app.close();
     process.exit(0);
