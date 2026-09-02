@@ -55,8 +55,10 @@ export function startHttpServer({ port, tools, rundit }: HttpServerDeps): Promis
   return new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '0.0.0.0', () => {
+      const address = server.address();
+      const actualPort = address && typeof address !== 'string' ? address.port : port;
       process.stderr.write(
-        `[rundit-mcp] http transport listening on :${port} (POST ${MCP_PATH})\n`,
+        `[rundit-mcp] http transport listening on :${actualPort} (POST ${MCP_PATH})\n`,
       );
       resolve(server);
     });
