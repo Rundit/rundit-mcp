@@ -12,6 +12,8 @@
     "register:local": "./scripts/register-mcp.sh",
     "register:local:remove": "./scripts/register-mcp.sh --remove",
     "register:local:show": "./scripts/register-mcp.sh --show",
+    "lint": "oxlint src scripts test",
+    "test": "vitest run",
     "start": "node dist/main.js"
   },
   "dependencies": {
@@ -20,13 +22,15 @@
     "@nestjs/common": "^11.1.24",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.24",
-    "@rundit-sdk/client": "0.3.1",
+    "@rundit-sdk/client": "0.3.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "typescript": "^6.0.3"
+    "oxlint": "^1.81.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
   }
 }

@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+
+# Hosted-MCP image (cloud66). Unlike ./Dockerfile — which strips
+# @rundit-sdk/client and reinstalls it at a dist-tag on every container start —
+# this image bakes the SDK at build time: the version pinned in
+# package-lock.json, or a dist-tag/version passed as a build arg. The result is
+# an immutable image with instant cold start and no npm egress at runtime; SDK
+# updates ship as a version-bump commit (or an rc-tag build) plus a redeploy.
+
+FROM node:24-alpine
+WORKDIR /app
+
+# Optional override for the test/staging stream, e.g. --build-arg RUNDIT_SDK_VERSION=rc.
+# Empty (the default) keeps the exact version from package-lock.json.
+ARG RUNDIT_SDK_VERSION=
+
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev --no-audit --no-fund \
+ && if [ -n "$RUNDIT_SDK_VERSION" ]; then \
+      npm install --no-audit --no-fund "@rundit-sdk/client@${RUNDIT_SDK_VERSION}"; \
+    fi
+
+COPY tsconfig.json ./
+COPY scripts ./scripts
+COPY src ./src
+
+# codegen from the installed SDK's openapi.json + tsc, then drop dev deps.
+RUN npm run build \
+ && npm prune --omit=dev \
+ && npm cache clean --force
+
+# RUNDIT_BASE_URL defaults to the backend's in-cluster service address;
+# override per environment at runtime if needed.
+ENV NODE_ENV=production \
+    MCP_TRANSPORT=http \
+    PORT=3001 \
+    RUNDIT_BASE_URL=http://backend:3000/api/v2/sdk
+
+EXPOSE 3001
+CMD ["node", "dist/main.js"]
