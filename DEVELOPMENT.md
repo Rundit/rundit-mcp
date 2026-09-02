@@ -183,7 +183,7 @@ http (`MCP_TRANSPORT=http PORT=3001 npm start`, or the `Dockerfile.hosted` image
 curl http://localhost:3001/health
 # 401 without a key:
 curl -i -X POST http://localhost:3001/mcp -H 'Content-Type: application/json' -d '{}'
-# tools/list with a key (stateless — no initialize round-trip needed):
+# minimal tools/list endpoint smoke check with a key:
 curl -X POST http://localhost:3001/mcp \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
