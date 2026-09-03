@@ -2,6 +2,7 @@ import { z, type ZodTypeAny } from 'zod';
 
 export interface JsonSchemaFragment {
   type?: string;
+  nullable?: boolean;
   description?: string;
   enum?: string[];
   items?: JsonSchemaFragment;
@@ -59,6 +60,7 @@ function schemaToZod(schema: JsonSchemaFragment): ZodTypeAny {
     default:
       base = z.unknown();
   }
+  if (schema.nullable) base = base.nullable();
   if (schema.description) base = base.describe(schema.description);
   return base;
 }
