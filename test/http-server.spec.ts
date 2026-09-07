@@ -181,4 +181,5 @@ describe('http transport', () => {
     expect(body.result.isError).toBe(true);
     expect(JSON.parse(body.result.content[0].text).error).toBeTruthy();
   });
+
 });

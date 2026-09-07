@@ -46,4 +46,18 @@ describe('schemaToZodShape', () => {
     expect(shape.companyIds.safeParse(['1']).success).toBe(false);
     expect(shape.filter.safeParse({ search: 'x' }).success).toBe(true);
   });
+
+  it('accepts null for nullable properties without making them optional', () => {
+    const shape = schemaToZodShape({
+      type: 'object',
+      properties: {
+        value: { type: 'number', nullable: true },
+      },
+      required: ['value'],
+    });
+
+    expect(shape.value.safeParse(null).success).toBe(true);
+    expect(shape.value.safeParse(42).success).toBe(true);
+    expect(shape.value.safeParse(undefined).success).toBe(false);
+  });
 });
