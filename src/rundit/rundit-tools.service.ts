@@ -54,7 +54,7 @@ type ToolResult = {
   isError?: boolean;
 };
 
-async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
+export async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
   try {
     const data = await fn();
     return { content: [{ type: 'text', text: JSON.stringify(data ?? null) }] };

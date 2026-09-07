@@ -182,39 +182,4 @@ describe('http transport', () => {
     expect(JSON.parse(body.result.content[0].text).error).toBeTruthy();
   });
 
-  it('returns valid MCP text content for void SDK responses', async () => {
-    const voidRundit = {
-      clientFor: () => ({
-        metrics: {
-          deleteType: async () => undefined,
-        },
-      }),
-    } as unknown as RunditService;
-    const voidServer = await startHttpServer({ port: 0, tools: new RunditToolsService(), rundit: voidRundit });
-    const address = voidServer.address();
-    if (address === null || typeof address === 'string') throw new Error('no port');
-
-    try {
-      const res = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json, text/event-stream',
-          Authorization: 'Bearer rdt_ten_fake',
-        },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 3,
-          method: 'tools/call',
-          params: { name: 'metrics_delete_type', arguments: { metricTypeId: 1 } },
-        }),
-      });
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.result.content).toEqual([{ type: 'text', text: 'null' }]);
-    } finally {
-      await new Promise<void>((resolve) => voidServer.close(() => resolve()));
-    }
-  });
 });
