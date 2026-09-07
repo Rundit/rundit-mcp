@@ -52,6 +52,15 @@ describe('generated SDK invocation', () => {
     expect(write).toHaveBeenCalledWith(2, 17, { value: 42 }, { dryRun: true });
   });
 
+  it('separates query parameters from a body without path parameters', async () => {
+    const write = vi.fn().mockResolvedValue(undefined);
+    const invoke = compile({ queryParamNames: ['dryRun'], hasBody: true, hasQuery: true });
+
+    await invoke({ metrics: { write } }, { dryRun: true, value: 42 });
+
+    expect(write).toHaveBeenCalledWith({ value: 42 }, { dryRun: true });
+  });
+
   it('keeps body-only and path-plus-query calls unchanged', async () => {
     const bodyWrite = vi.fn().mockResolvedValue(undefined);
     const queryRead = vi.fn().mockResolvedValue(undefined);
