@@ -142,9 +142,21 @@ Two consequences:
 
 The hosted image ([`Dockerfile.hosted`](Dockerfile.hosted), built by Cloud 66
 BuildGrid via [`build.yml`](build.yml)) bakes the SDK at image-build time from
-the dist-tag in the stack's `RUNDIT_SDK_VERSION` environment variable — `rc`
-on the test stack, `latest` on the production stack. Builds without the arg
-(local `docker build`) fall back to the exact version in `package-lock.json`.
+a dist-tag held in the stack's **`HABITUS_RUNDIT_SDK_VERSION`** application
+environment variable — `rc` on the test stack, `latest` on the production
+stack. The `HABITUS_` prefix is mandatory: Cloud 66 only exposes app env vars
+to the Habitus build under that prefix (stripped inside Habitus), so an
+unprefixed `RUNDIT_SDK_VERSION` is invisible to the build and the image
+silently bakes the `package-lock.json` pin instead. `build.yml` forwards the
+value both as a Docker build arg (`_env(RUNDIT_SDK_VERSION)`) and as a Habitus
+env secret (`sdk_version`); the Dockerfile takes whichever is present and the
+build log prints `==> SDK version source: … -> '<value>'` followed by
+`==> Baked @rundit-sdk/client@<version>` — check those two lines first when
+the running server reports an unexpected tool count. Builds outside Cloud 66
+(`docker build`, or `--build-arg RUNDIT_SDK_VERSION=rc` to override) fall back
+to the exact version in `package-lock.json`. The step is `no_cache: true` so a
+redeploy always re-resolves the dist-tag instead of reusing the cached npm
+layer.
 
 Deployments follow SDK releases automatically: after every publish,
 `rundit-sdk`'s publish workflow waits for npm to serve the new version on the
