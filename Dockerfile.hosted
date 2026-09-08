@@ -2,25 +2,45 @@
 
 # Hosted-MCP image (cloud66). Unlike ./Dockerfile — which strips
 # @rundit-sdk/client and reinstalls it at a dist-tag on every container start —
-# this image bakes the SDK at build time: the dist-tag/version passed as a
-# build arg (Cloud 66 stacks set RUNDIT_SDK_VERSION — test: rc, prod: latest),
-# or the version pinned in package-lock.json when the arg is empty. The result
-# is an immutable image with instant cold start and no npm egress at runtime;
-# SDK releases redeploy automatically — rundit-sdk's publish workflow calls the
-# stack's Cloud 66 redeployment hook, and the rebuild bakes the fresh tag.
+# this image bakes the SDK at build time. The dist-tag/version comes from, in
+# order of precedence:
+#   1. --build-arg RUNDIT_SDK_VERSION=<tag|version>   (local builds, CI)
+#   2. the Habitus secret `sdk_version` declared in build.yml, which Cloud 66
+#      populates from the application env var HABITUS_RUNDIT_SDK_VERSION
+#      (test stack: rc, prod stack: latest)
+#   3. the exact version pinned in package-lock.json (fallback when neither is
+#      set, e.g. a plain `docker build`)
+# The result is an immutable image with instant cold start and no npm egress at
+# runtime. The build log prints which source won and which version got baked.
 
 FROM node:24-alpine
 WORKDIR /app
 
 # Dist-tag or version to bake, e.g. --build-arg RUNDIT_SDK_VERSION=rc.
-# Empty (the default) keeps the exact version from package-lock.json.
+# Empty (the default) defers to the Habitus secret, then package-lock.json.
 ARG RUNDIT_SDK_VERSION=
+# Injected by Habitus when a build.yml step declares secrets; empty otherwise.
+ARG habitus_host=
+ARG habitus_port=
+ARG habitus_user=
+ARG habitus_password=
 
 COPY package.json package-lock.json ./
-RUN npm ci --include=dev --no-audit --no-fund \
- && if [ -n "$RUNDIT_SDK_VERSION" ]; then \
-      npm install --no-audit --no-fund "@rundit-sdk/client@${RUNDIT_SDK_VERSION}"; \
-    fi
+# Resolve the SDK version (see header), install, and log what got baked. One
+# RUN so the resolved value survives (shell variables do not cross RUN lines).
+RUN set -eu; \
+    SDK_VERSION="$RUNDIT_SDK_VERSION"; SOURCE="build arg"; \
+    if [ -z "$SDK_VERSION" ] && [ -n "$habitus_host" ]; then \
+      SDK_VERSION="$(wget -qO- "http://${habitus_user:+$habitus_user:$habitus_password@}$habitus_host:$habitus_port/v1/secrets/env/sdk_version" || true)"; \
+      SOURCE="habitus secret sdk_version"; \
+    fi; \
+    if [ -z "$SDK_VERSION" ]; then SOURCE="package-lock.json pin (no build arg, no habitus secret)"; fi; \
+    echo "==> SDK version source: $SOURCE -> '${SDK_VERSION:-<lockfile>}'"; \
+    npm ci --include=dev --no-audit --no-fund; \
+    if [ -n "$SDK_VERSION" ]; then \
+      npm install --no-audit --no-fund "@rundit-sdk/client@${SDK_VERSION}"; \
+    fi; \
+    echo "==> Baked @rundit-sdk/client@$(node -p "require('./node_modules/@rundit-sdk/client/package.json').version")"
 
 COPY tsconfig.json ./
 COPY scripts ./scripts

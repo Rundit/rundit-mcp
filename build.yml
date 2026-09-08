@@ -1,18 +1,37 @@
 # Habitus build file, processed by Cloud 66 (BuildGrid) when building the
-# hosted MCP image. It exists to pass RUNDIT_SDK_VERSION through to the
-# Dockerfile ARG — service.yml has no build-args support.
+# hosted MCP image. Its job is to get the SDK dist-tag into the image build —
+# service.yml has no build-args support.
 #
-# _env(RUNDIT_SDK_VERSION) resolves from the stack's environment at build
-# time. Each stack tracks an npm dist-tag: RUNDIT_SDK_VERSION=rc on the test
-# stack, =latest on the production stack — rundit-sdk's publish workflow hits
-# the stack's redeployment hook after each publish, and the rebuild bakes the
-# fresh tag. Unset (builds outside Cloud 66) it becomes an empty string, so
-# Dockerfile.hosted falls back to the exact SDK version in package-lock.json.
+# How the value travels (Cloud 66 docs — Habitus on BuildGrid): Cloud 66
+# exposes application env vars to the Habitus build ONLY under a HABITUS_
+# prefix, with the prefix stripped inside Habitus. So the application env var
+# must be named
+#     HABITUS_RUNDIT_SDK_VERSION = rc      (test stack)
+#     HABITUS_RUNDIT_SDK_VERSION = latest  (production stack)
+# and it reaches Dockerfile.hosted through two channels, either of which is
+# enough (the build log prints which one won):
+#   1. `args` -> `_env(RUNDIT_SDK_VERSION)` -> Docker ARG RUNDIT_SDK_VERSION
+#   2. `secrets` -> Habitus secret `sdk_version` (type env, host var
+#      HABITUS_RUNDIT_SDK_VERSION) -> fetched inside the Dockerfile from the
+#      Habitus secrets endpoint (ARG habitus_host/habitus_port are injected)
+# A plain, unprefixed RUNDIT_SDK_VERSION app var is invisible to the build:
+# `_env()` then resolves to an empty string (no error) and the image silently
+# bakes the package-lock.json pin — which is what happened on 2026-09-08
+# (`prepared 18 tools from @rundit-sdk/client v0.3.3`).
+#
+# no_cache: the npm install line is textually identical between builds, so a
+# cached layer would keep serving the previously resolved dist-tag version
+# forever. Rebuild from scratch — the image is small and the build is ~1 min.
 build:
   version: 2016-03-14
   steps:
     mcp:
       name: mcp
       dockerfile: Dockerfile.hosted
+      no_cache: true
       args:
         RUNDIT_SDK_VERSION: _env(RUNDIT_SDK_VERSION)
+      secrets:
+        sdk_version:
+          type: env
+          value: RUNDIT_SDK_VERSION
