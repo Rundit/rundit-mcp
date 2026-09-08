@@ -12,13 +12,22 @@
 FROM node:24-alpine
 WORKDIR /app
 
+# Cache-buster. Docker re-downloads an ADD URL on every build and keys the
+# layer cache on its content, so when the dist-tag moves to a new version this
+# layer changes and everything below it (the npm install) is rebuilt. Without
+# it the install line is byte-identical between builds and a cached layer
+# would keep serving the previously resolved version. No build args, no
+# no-cache flag needed.
+ADD https://registry.npmjs.org/@rundit-sdk/client/rc /tmp/sdk-tag.json
+
 COPY package.json package-lock.json ./
 # Install the lockfile, then move the SDK to the dist-tag. The override SAVES
 # to the image's package.json/package-lock.json on purpose (no --no-save): the
 # later `npm prune --omit=dev` reconciles against the lockfile and would roll a
 # --no-save install back to the pinned version. Those manifests live only in
 # this image and describe exactly what got baked.
-RUN npm ci --include=dev --no-audit --no-fund \
+RUN echo "==> Target @rundit-sdk/client@rc = $(node -p 'require("/tmp/sdk-tag.json").version')" \
+ && npm ci --include=dev --no-audit --no-fund \
  && npm install --include=dev --no-audit --no-fund @rundit-sdk/client@rc \
  && echo "==> Baked @rundit-sdk/client@$(node -p 'require("./node_modules/@rundit-sdk/client/package.json").version')"
 

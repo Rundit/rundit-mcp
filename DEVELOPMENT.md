@@ -152,10 +152,14 @@ Each Cloud 66 stack selects its file via `dockerfile_path` in its service.yml
 (`mcp` service). No build args, Habitus secrets, or stack env vars are
 involved — the tag is literally in the file. The build log prints
 `==> Baked @rundit-sdk/client@<version>`; check that line first when the
-running server reports an unexpected tool count. The `npm install` line is
-textually identical between builds, so if the stack's build reuses cached
-layers it will keep serving the previously resolved version — rebuild without
-cache to pick up a newly published tag.
+running server reports an unexpected tool count. Layer caching cannot pin a
+stale version: each Dockerfile `ADD`s the npm registry manifest for its
+dist-tag (`registry.npmjs.org/@rundit-sdk/client/<tag>`) before the install,
+and Docker re-fetches ADD URLs on every build and keys the cache on their
+content, so a moved tag rebuilds the install layer automatically. The build
+log also prints `==> Target @rundit-sdk/client@<tag> = <version>` from that
+manifest; if Target and Baked disagree, the build reached the registry but
+`npm install` did not resolve the same tag.
 
 Deployments follow SDK releases automatically: after every publish,
 `rundit-sdk`'s publish workflow waits for npm to serve the new version on the
