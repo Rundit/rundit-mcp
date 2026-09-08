@@ -1,14 +1,15 @@
 // AUTO-GENERATED FILE — DO NOT EDIT.
 // Regenerate with: npm run codegen
-// Source: @rundit-sdk/client v0.3.3 (openapi.json)
+// Source: @rundit-sdk/client v0.3.4 (openapi.json)
 
 import type { RunditClient } from '@rundit-sdk/client';
 
-export const SDK_VERSION = "0.3.3";
+export const SDK_VERSION = "0.3.4";
 
 export interface ToolSpec {
   name: string;
   description: string;
+  annotations: { readOnlyHint: boolean; destructiveHint: boolean };
   inputSchema: {
     type: 'object';
     properties: Record<string, unknown>;
@@ -22,17 +23,20 @@ export interface ToolSpec {
 export const TOOLS: ToolSpec[] = [
   {
     name: "companies_get_all",
-    description: "List companies available to the SDK consumer\n\nReturns the compact form (id, name, currency, type, website, logo) for every company the caller can read. Filter by `companyIds`, `companyGroupIds`, and/or `nameSearch` (case-insensitive substring on display name; accepts an array to resolve multiple companies at once with OR semantics — e.g. `nameSearch=[\"acme\",\"beta\",\"gamma\"]` returns any company whose name contains any of the three substrings). Avoids listing the full portfolio when the agent only knows companies by name.",
+    description: "List companies available to the SDK consumer\n\nReturns the compact form (id, name, currency, type, website, logo) for every company the caller can read. Filter by `companyIds`, `companyGroupIds`, and/or `nameSearch` (case-insensitive substring on display name; accepts an array to resolve multiple companies at once with OR semantics — e.g. `nameSearch=[\"acme\",\"beta\",\"gamma\"]` returns any company whose name contains any of the three substrings). Avoids listing the full portfolio when the agent only knows companies by name. Ordered by company id ascending.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyIds": {
           "type": "array",
@@ -63,6 +67,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "companies_get_dashboard",
     description: "Get full company dashboard for ONE company\n\nReturns company metadata, positions per fund, all metrics with data points, recent transactions, and report summaries for a single company. For more than one company, prefer POST /companies/dashboards (`companies.getDashboards`) instead — it returns the same payload per company in one call and avoids the N+1 pattern. Use `metricsFrom` to limit metric history, `transactionLimit` and `reportLimit` to cap list sizes.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -99,10 +104,21 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "companies_get_dashboards",
-    description: "PREFERRED tool for multi-company analysis — full dashboards for many companies in one call\n\nPREFERRED tool for multi-company analysis. Returns full dashboards (company metadata, positions, metrics with data points, recent transactions, report summaries) for many companies in a single request, grouped per company. Use this instead of looping `GET /companies/:id/dashboard` (the N+1 pattern) whenever the agent needs to look at more than one company — it returns the same shape per company but in one round trip. Typical workflow: resolve company ids (e.g. `GET /companies?nameSearch=[\"acme\",\"beta\"]`), then call this with their `companyIds`. Use `metricTypeIds` or `metricTypeNames` to scope the returned metrics. `metricsFrom` (ISO 8601) sets a lower-bound date for metric data points; omit to include all history. `metricsTimeframe` restricts data point granularity to Month, Quarter, or Year. `currency` (ISO 4217, required) FX-converts all monetary metrics across the batch. `conversionStrategy` controls which rate is applied: `LATEST_FX_RATE` (default) or `ENTITY_DATE_RATE` (the rate on each point's own date). `transactionLimit` / `reportLimit` cap list sizes per company (defaults: 10 and 5 respectively).",
+    description: "PREFERRED tool for multi-company analysis — full dashboards for many companies in one call\n\nPREFERRED tool for multi-company analysis. Returns full dashboards (company metadata, positions, metrics with data points, recent transactions, report summaries) for many companies in a single request, grouped per company. Use this instead of looping `GET /companies/:id/dashboard` (the N+1 pattern) whenever the agent needs to look at more than one company — it returns the same shape per company but in one round trip. Typical workflow: resolve company ids (e.g. `GET /companies?nameSearch=[\"acme\",\"beta\"]`), then call this with their `companyIds`. Use `metricTypeIds` or `metricTypeNames` to scope the returned metrics. `metricsFrom` (ISO 8601) sets a lower-bound date for metric data points; omit to include all history. `metricsTimeframe` restricts data point granularity to Month, Quarter, or Year. `currency` (ISO 4217, required) FX-converts all monetary metrics across the batch. `conversionStrategy` controls which rate is applied: `LATEST_FX_RATE` (default) or `ENTITY_DATE_RATE` (the rate on each point's own date). `transactionLimit` / `reportLimit` cap list sizes per company (defaults: 10 and 5 respectively). Dashboards come back in the order the `companyIds` were requested, so `limit`/`cursor` paging is stable.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
+        "limit": {
+          "type": "number",
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested.",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+        },
         "companyIds": {
           "description": "Company identifiers to include in the batch.",
           "type": "array",
@@ -171,6 +187,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "companies_get_one",
     description: "Get one company available to the SDK consumer\n\nReturns the full company object for a single company. Includes all compact-list fields (id, name, type, currency, website, logo) plus extended metadata: legal name, status, description, vision, address, city, state, country, operating countries, VAT number, founding year, established date, total funding, and accessible fund ids (as `companyGroupIds`). Returns 404 if the company does not exist or is inaccessible to the caller.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -188,17 +205,20 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "company_groups_get_all",
-    description: "List funds available to the SDK consumer\n\nReturns compact fund metadata (id, name, demo flag, color, member company ids). Filter by `companyGroupIds` and/or `nameSearch` (case-insensitive substring on name; accepts an array to resolve multiple groups in one call with OR semantics — e.g. `nameSearch=[\"fund i\",\"fund ii\"]`).",
+    description: "List funds available to the SDK consumer\n\nReturns compact fund metadata (id, name, demo flag, color, member company ids). Filter by `companyGroupIds` and/or `nameSearch` (case-insensitive substring on name; accepts an array to resolve multiple groups in one call with OR semantics — e.g. `nameSearch=[\"fund i\",\"fund ii\"]`). Ordered by fund id ascending.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -222,6 +242,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "company_groups_get_one",
     description: "Get one fund available to the SDK consumer\n\nReturns full fund details. Includes all compact-list fields (id, name, type, currency, logo) plus extended fund metadata: legal name, domicile, management company, GP, vintage year, fund currency, opening and closing dates, legal form, investment policy, fees, regulatory info, and service providers. Also includes the list of member companies the caller can access. Returns 404 if the fund does not exist or is inaccessible to the caller.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -240,6 +261,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "company_reports_get_one",
     description: "Fetch the full content of a single company report\n\nReturns the report metadata plus structured sections (text/markdown/image) and attachments with pre-signed URLs. Returns 404 if the report does not exist and 403 if the caller cannot access it under their role-based permissions.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -257,17 +279,20 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "company_reports_list",
-    description: "List published company reports accessible to the caller (metadata only)\n\nReturns lightweight report metadata (id, title, period, publisher company reference). Use GET /company-reports/:id to fetch the full content of a specific report. Visibility is determined by the caller's roles — VC users see reports for managed-portfolio companies, company employees see their own company's reports, portfolio investors see Published reports shared with their visibility groups. Filters narrow the list by company ids, funds (`companyGroupIds`), company name substring (`companyNameSearch`), and reporting period (timeframe + date range).",
+    description: "List published company reports accessible to the caller (metadata only)\n\nReturns lightweight report metadata (id, title, period, publisher company reference). Use GET /company-reports/:id to fetch the full content of a specific report. Visibility is determined by the caller's roles — VC users see reports for managed-portfolio companies, company employees see their own company's reports, portfolio investors see Published reports shared with their visibility groups. Filters narrow the list by company ids, funds (`companyGroupIds`), company name substring (`companyNameSearch`), and reporting period (timeframe + date range). Ordered by report date descending, then id descending — newest first.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyIds": {
           "type": "array",
@@ -313,18 +338,182 @@ export const TOOLS: ToolSpec[] = [
     invoke: (client, args) => client.companyReports.list(args),
   },
   {
+    name: "metric_templates_create_entry",
+    description: "Request a metric through the VC template\n\nCreates company metric rows or links existing rows for matching companies, and synchronizes forecast/budget requests. May notify companies. Selectors are OR-combined. Duplicate type entries return 409, never replace existing targeting. all targets the entire VC portfolio and requires a VC admin. Does not write point values.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string"
+        },
+        "metricTypeId": {
+          "type": "number",
+          "description": "Accessible predefined or VC-owned custom type. Cannot change on update."
+        },
+        "hasForecast": {
+          "type": "boolean"
+        },
+        "hasBudget": {
+          "type": "boolean"
+        },
+        "companyFilter": {
+          "minItems": 1,
+          "maxItems": 250,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "group",
+                  "company"
+                ],
+                "description": "Selectors are OR-combined. all means the whole VC portfolio and requires VC admin access."
+              },
+              "value": {
+                "type": "number",
+                "description": "Company or company-group id; omit for all."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        "position": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "templateId",
+        "metricTypeId",
+        "hasForecast",
+        "hasBudget",
+        "companyFilter"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { templateId, ...body }) => client.metricTemplates.createEntry(templateId, body),
+  },
+  {
+    name: "metric_templates_delete_entry",
+    description: "Stop requesting a metric through the template\n\nRemoves the template entry and unlinks this VC from matching company metrics and their forecast/budget rows. Preserves stored actual, forecast and budget data and other investors requests. Empty, unrequested rows may be removed. Does not delete the metric type. Use metrics.delete only for explicit data deletion.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string"
+        },
+        "entryId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "templateId",
+        "entryId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { templateId, entryId }) => client.metricTemplates.deleteEntry(templateId, entryId),
+  },
+  {
+    name: "metric_templates_get",
+    description: "Get the VC metric template\n\nReturns the caller VC template and entries whose complete targeting is accessible. Entries define requested metric types, company/group filters and forecast/budget rows. An entry hidden due to wider targeting cannot be replaced by creating another entry for the same type.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    invoke: (client) => client.metricTemplates.get(),
+  },
+  {
+    name: "metric_templates_update_entry",
+    description: "Update a metric template entry\n\nReplaces targeting and requested forecast/budget flags. Requires access to both old and new targets. Keep metricTypeId unchanged. Removing companies stops requesting the metric; stored data is preserved. Does not change metric points or the custom type definition.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string"
+        },
+        "entryId": {
+          "type": "string"
+        },
+        "metricTypeId": {
+          "type": "number",
+          "description": "Accessible predefined or VC-owned custom type. Cannot change on update."
+        },
+        "hasForecast": {
+          "type": "boolean"
+        },
+        "hasBudget": {
+          "type": "boolean"
+        },
+        "companyFilter": {
+          "minItems": 1,
+          "maxItems": 250,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "group",
+                  "company"
+                ],
+                "description": "Selectors are OR-combined. all means the whole VC portfolio and requires VC admin access."
+              },
+              "value": {
+                "type": "number",
+                "description": "Company or company-group id; omit for all."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        "position": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "templateId",
+        "entryId",
+        "metricTypeId",
+        "hasForecast",
+        "hasBudget",
+        "companyFilter"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { templateId, entryId, ...body }) => client.metricTemplates.updateEntry(templateId, entryId, body),
+  },
+  {
     name: "metrics_aggregate",
-    description: "Aggregate metrics across portfolio companies\n\nReturns aggregated metric values (SUM, AVG, MEDIAN, MIN, MAX, COUNT) across companies for each reporting period. Pass `metricTypeIds` (resolve from /metrics/types) to select what to aggregate; names are not accepted on this endpoint to keep selection stable. Optionally group results by fund (`companyGroupId`) for fund-level breakdowns. MIN, MAX, and COUNT are always computed. SUM, AVG, and MEDIAN are only produced when the metric type enables them in its `summaryAggregationMethods` configuration; otherwise `point.value` is `null` for that aggregation.",
+    description: "Aggregate metrics across portfolio companies\n\nReturns aggregated metric values (SUM, AVG, MEDIAN, MIN, MAX, COUNT) across companies for each reporting period. Pass `metricTypeIds` (resolve from /metrics/types) to select what to aggregate; names are not accepted on this endpoint to keep selection stable. Optionally group results by fund (`companyGroupId`) for fund-level breakdowns. MIN, MAX, and COUNT are always computed. SUM, AVG, and MEDIAN are only produced when the metric type enables them in its `summaryAggregationMethods` configuration; otherwise `point.value` is `null` for that aggregation. Ordered by metric type id, then aggregation, then fund id.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested.",
+          "minimum": 1,
+          "maximum": 500
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "metricTypeIds": {
           "description": "Metric type identifiers to aggregate. Resolve names to ids via /metrics/types.",
@@ -409,17 +598,10 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "metrics_compare",
     description: "Compare metrics across companies\n\nReturns date-aligned rows for one or more metric types across multiple companies. Pass `metricTypeIds` (resolve from /metrics/types) to compare several metrics in a single round trip; names are not accepted on this endpoint to keep selection stable. Each row contains one value per company for a given period. Optionally includes period-over-period percentage change. Use `companyIds`, `companyNameSearch`, or `companyGroupIds` to select companies.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
-        "limit": {
-          "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
-        },
-        "cursor": {
-          "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
-        },
         "metricTypeIds": {
           "description": "Metric type identifiers to compare (resolve names to ids via /metrics/types). When multiple ids are provided, the response contains one entry per metric type.",
           "example": [
@@ -495,28 +677,263 @@ export const TOOLS: ToolSpec[] = [
     invoke: (client, args) => client.metrics.compare(args),
   },
   {
-    name: "metrics_get_types",
-    description: "List metric types available to the SDK consumer\n\nReturns predefined metric types plus user-defined metric types scoped to the caller — VC group custom types for VC users, company custom types for company users. Each entry carries the metric shape needed to interpret values: `valueType` is `\"numeric\"` (read `point.value` as a number; may carry `rangeConfig` with min/max/step for ranged metrics) or `\"option\"` (read `point.optionValue` as a string from `optionConfig.options[]` — this is how boolean / yes-no metrics are encoded, as two options typically labelled \"Yes\"/\"No\"). `unit.unit` describes the measurement (`Currency`, `Percentage`, `Number`, time units, ...); `unit.currencyCode` is intentionally null on this endpoint because monetary types resolve their concrete currency per company — call /metrics to receive `unit.currencyCode` populated with each company's native currency, or pass `currency` to convert all monetary metrics to a chosen target.",
+    name: "metrics_create_type",
+    description: "Create a VC-owned custom metric type\n\nCreates a definition only, not company rows. Add the returned type to a metric template to request it from companies. Ownership is derived from the API key user. Numeric, ranged numeric and option metrics are supported; formulas are not.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
     inputSchema: {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the custom metric definition. Does not create company rows."
+        },
+        "shortName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "valueType": {
+          "type": "string",
+          "enum": [
+            "numeric",
+            "option"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "Percentage",
+            "Currency",
+            "Number",
+            "Second",
+            "Minute",
+            "Hour",
+            "Day",
+            "Week",
+            "Month",
+            "Quarter",
+            "Year"
+          ],
+          "nullable": true,
+          "description": "Required for numeric metrics; omit for option metrics."
+        },
+        "aggMethod": {
+          "type": "string",
+          "enum": [
+            "SUM",
+            "LAST_AVAILABLE",
+            "AVG",
+            "NONE"
+          ],
+          "description": "Across-period aggregation. Option and ranged metrics require NONE."
+        },
+        "summaryAggregationMethods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "SUM",
+              "AVG",
+              "MEDIAN",
+              "COUNT_POSITIVES",
+              "AVG_POSITIVES_PERCENTAGE"
+            ]
+          }
+        },
+        "optionConfig": {
+          "type": "object",
+          "properties": {
+            "options": {
+              "minItems": 1,
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "isPositive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "value",
+                  "isPositive"
+                ]
+              }
+            }
+          },
+          "required": [
+            "options"
+          ]
+        },
+        "rangeConfig": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "step": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "min",
+            "max",
+            "step"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "valueType",
+        "aggMethod",
+        "summaryAggregationMethods"
+      ],
       "additionalProperties": false
     },
-    invoke: (client) => client.metrics.getTypes(),
+    invoke: (client, args) => client.metrics.createType(args),
+  },
+  {
+    name: "metrics_delete",
+    description: "Delete a company metric row and its data\n\nDestructively deletes the company row and all child forecast/budget rows and points. Requires company metric DELETE permission and rejects rows or children still requested by any investor with 409. Remove template requests first. Does not delete the metric type or edit a template. Missing rows return 404.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "metricId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricId }) => client.metrics.delete(metricId),
+  },
+  {
+    name: "metrics_delete_points",
+    description: "Delete selected metric points\n\nDeletes stored points identified by exact date and timeframe for one metric instance. Missing points are a no-op. Does not delete the metric row, metric type, template entry, or underlying points of calculated aggregates. Calculated values may still appear on reads when other stored points can be aggregated. Returns remaining stored points within the requested date bounds.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricId": {
+          "type": "number"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "Reporting period date (YYYY-MM-DD), on the first day of the month."
+              },
+              "timeframe": {
+                "type": "string",
+                "enum": [
+                  "Month",
+                  "Quarter",
+                  "Year"
+                ]
+              }
+            },
+            "required": [
+              "date",
+              "timeframe"
+            ]
+          }
+        }
+      },
+      "required": [
+        "metricId",
+        "points"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricId, ...body }) => client.metrics.deletePoints(metricId, body),
+  },
+  {
+    name: "metrics_delete_type",
+    description: "Delete an unused custom metric type\n\nDeletes a VC-owned custom definition only when no company row or template entry references it. Returns 409 when in use. Does not cascade-delete company data or templates. Predefined types cannot be deleted.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricTypeId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "metricTypeId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricTypeId }) => client.metrics.deleteType(metricTypeId),
+  },
+  {
+    name: "metrics_get_type_usage",
+    description: "Get custom metric type usage\n\nReturns template usage and accessible companies with rows referencing this VC-owned custom type. Inaccessible company details are never returned. Deletion checks all references, including those outside the caller visibility.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricTypeId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "metricTypeId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricTypeId }) => client.metrics.getTypeUsage(metricTypeId),
+  },
+  {
+    name: "metrics_get_types",
+    description: "List metric types available to the SDK consumer\n\nReturns predefined metric types plus user-defined metric types scoped to the caller — VC group custom types for VC users, company custom types for company users. Each entry carries the metric shape needed to interpret values: `valueType` is `\"numeric\"` (read `point.value` as a number; may carry `rangeConfig` with min/max/step for ranged metrics) or `\"option\"` (read `point.optionValue` as a string from `optionConfig.options[]` — this is how boolean / yes-no metrics are encoded, as two options typically labelled \"Yes\"/\"No\"). `unit.unit` describes the measurement (`Currency`, `Percentage`, `Number`, time units, ...); `unit.currencyCode` is intentionally null on this endpoint because monetary types resolve their concrete currency per company — call /metrics to receive `unit.currencyCode` populated with each company's native currency, or pass `currency` to convert all monetary metrics to a chosen target. Ordered by metric type id ascending.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "minimum": 1,
+          "maximum": 500,
+          "type": "number",
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+        }
+      },
+      "additionalProperties": false
+    },
+    invoke: (client, args) => client.metrics.getTypes(args),
   },
   {
     name: "metrics_search",
-    description: "Read metric values for accessible companies, grouped by company\n\nReturns metric data points for companies the caller can access (companies in the caller's VC group portfolio, or the caller's own company for company users). Each entry carries company and metric type references with id and human-readable name. Each point carries both `value` (number, for `valueType === \"numeric\"`, including ranged numerics constrained by the type's `rangeConfig`) and `optionValue` (string, for `valueType === \"option\"`, matching one of `metricType.optionConfig.options[].value` — this is how boolean/yes-no metrics report their reading); read whichever matches the metric type's `valueType`. Filter by company id, company name substring (`companyNameSearch`), company group, metric type id, metric type name (`metricTypeNames`), timeframe, and date range to narrow the response. Pass `currency` (ISO 4217) to FX-convert monetary metrics to that target currency in one call instead of fetching company currencies separately.",
+    description: "Read metric values for accessible companies, grouped by company\n\nReturns metric data points for companies the caller can access (companies in the caller's VC group portfolio, or the caller's own company for company users). Each entry carries company and metric type references with id and human-readable name. Each point carries both `value` (number, for `valueType === \"numeric\"`, including ranged numerics constrained by the type's `rangeConfig`) and `optionValue` (string, for `valueType === \"option\"`, matching one of `metricType.optionConfig.options[].value` — this is how boolean/yes-no metrics report their reading); read whichever matches the metric type's `valueType`. Filter by company id, company name substring (`companyNameSearch`), company group, metric type id, metric type name (`metricTypeNames`), timeframe, and date range to narrow the response. Pass `currency` (ISO 4217) to FX-convert monetary metrics to that target currency in one call instead of fetching company currencies separately. Entries are ordered by company id ascending — one entry per company, so `limit` pages whole companies, never partial metric lists.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested.",
+          "minimum": 1,
+          "maximum": 500
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyIds": {
           "description": "Restrict results to these companies. Defaults to all companies the caller can access.",
@@ -588,8 +1005,66 @@ export const TOOLS: ToolSpec[] = [
     invoke: (client, args) => client.metrics.search(args),
   },
   {
+    name: "metrics_write_points",
+    description: "Upsert metric points\n\nWrites points for one metric instance. Set exactly one of value or optionValue according to the metric type and set the other field to null.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricId": {
+          "type": "number"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "Reporting period date (YYYY-MM-DD), on the first day of the month."
+              },
+              "value": {
+                "type": "number",
+                "nullable": true,
+                "example": 123,
+                "description": "Numeric value. Set to null for option metrics."
+              },
+              "optionValue": {
+                "type": "string",
+                "nullable": true,
+                "example": null,
+                "description": "Option value. Set to null for numeric metrics."
+              },
+              "timeframe": {
+                "type": "string",
+                "enum": [
+                  "Month",
+                  "Quarter",
+                  "Year"
+                ]
+              }
+            },
+            "required": [
+              "date",
+              "value",
+              "optionValue",
+              "timeframe"
+            ]
+          }
+        }
+      },
+      "required": [
+        "metricId",
+        "points"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricId, ...body }) => client.metrics.writePoints(metricId, body),
+  },
+  {
     name: "positions_get_company_positions",
-    description: "Get positions for one company\n\nReturns all fund-level positions for a single company — one entry per fund (`companyGroupId`) that holds a position in the company. Each entry carries invested amount, fair market value, ownership percentage, share counts, multiple, and ROI, all FX-converted to `currency` (ISO 4217, required). Filter by `companyGroupIds` to scope to specific funds. Use `date` (ISO 8601) for a historical snapshot; omit to use the latest available data.",
+    description: "Get positions for one company\n\nReturns all fund-level positions for a single company — one entry per fund (`companyGroupId`) that holds a position in the company. Each entry carries invested amount, fair market value, ownership percentage, share counts, multiple, and ROI, all FX-converted to `currency` (ISO 4217, required). Filter by `companyGroupIds` to scope to specific funds. Use `date` (ISO 8601) for a historical snapshot; omit to use the latest available data. Ordered by fund id ascending.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -598,12 +1073,14 @@ export const TOOLS: ToolSpec[] = [
           "description": "Company identifier"
         },
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -632,6 +1109,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "positions_get_portfolio_positions",
     description: "Get aggregated portfolio position totals\n\nReturns a single aggregated position object that sums invested amount, fair market value, ownership percentage, share counts, multiple, and ROI across all accessible companies (optionally filtered by `companyIds` and/or `companyGroupIds` to scope to specific funds). `currency` (ISO 4217, required) converts all monetary values. Use `date` (ISO 8601) for a historical snapshot; omit for the latest available data. For a per-company breakdown instead of a single aggregate, use `GET /positions/portfolio/summary`.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -667,17 +1145,20 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "positions_get_portfolio_summary",
-    description: "Get portfolio summary with positions and key metrics per company\n\nReturns one row per company with position data (invested, fair value, multiple, ROI) and latest values for selected metrics. Defaults to MRR, Cash Balance, Headcount, Net Burn Rate, and Runway. Override with `metricTypeNames`. Designed for portfolio overview tables.",
+    description: "Get portfolio summary with positions and key metrics per company\n\nReturns one row per company *per fund* — a company held by two funds appears twice, distinguished by `companyGroupId` — with position data (invested, fair value, multiple, ROI) and latest values for selected metrics. Defaults to MRR, Cash Balance, Headcount, Net Burn Rate, and Runway. Override with `metricTypeNames`. Designed for portfolio overview tables. Ordered by company id, then fund id.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -718,7 +1199,8 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "transactions_get_company_transactions",
-    description: "Get transactions for one company\n\nReturns all transactions for a single company, ordered by date descending. Each transaction is a typed variant — narrow it via its `type` field. Filter by `companyGroupIds` to scope to a specific fund, `types` to limit to specific transaction kinds, and `priorTo` (ISO 8601) for a historical snapshot. Requires transaction read access on the company.",
+    description: "Get transactions for one company\n\nReturns all transactions for a single company, ordered by date descending then id descending. Each transaction is a typed variant — narrow it via its `type` field. Filter by `companyGroupIds` to scope to a specific fund, `types` to limit to specific transaction kinds, and `priorTo` (ISO 8601) for a historical snapshot. Requires transaction read access on the company.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -727,12 +1209,14 @@ export const TOOLS: ToolSpec[] = [
           "description": "Company identifier"
         },
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -784,17 +1268,20 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "transactions_get_summary",
-    description: "Get transaction activity summary\n\nReturns aggregated transaction statistics: total invested, total realized, transaction count, company count, and breakdown by transaction type. Optionally group by period (Month, Quarter, Year). Filter by company, fund (`companyGroupIds`), and date range.",
+    description: "Get transaction activity summary\n\nReturns aggregated transaction statistics: total invested, total realized, transaction count, company count, and breakdown by transaction type. Optionally group by period (Month, Quarter, Year). Filter by company, fund (`companyGroupIds`), and date range. Ordered by period ascending.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -841,17 +1328,20 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "transactions_get_transactions",
-    description: "Get transactions for multiple companies\n\nReturns transactions across multiple companies. Each transaction is a typed variant — narrow it via its `type` field. Filter by `companyIds`, `companyGroupIds`, `types`, and `priorTo` (ISO 8601 upper-bound date for a historical snapshot). When `companyIds` is provided, the caller must have transaction read access on every listed company.",
+    description: "Get transactions for multiple companies\n\nReturns transactions across multiple companies. Each transaction is a typed variant — narrow it via its `type` field. Filter by `companyIds`, `companyGroupIds`, `types`, and `priorTo` (ISO 8601 upper-bound date for a historical snapshot). When `companyIds` is provided, the caller must have transaction read access on every listed company. Ordered by date descending, then id descending.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
         "limit": {
+          "minimum": 1,
+          "maximum": 500,
           "type": "number",
-          "description": "Maximum items per page. Currently accepted but not enforced; reserved for future pagination."
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's meta.nextCursor. Currently accepted but ignored."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
