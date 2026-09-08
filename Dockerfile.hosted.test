@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-# Hosted-MCP image for the PRODUCTION Cloud 66 stack. Bakes @rundit-sdk/client
-# at the `latest` npm dist-tag at image-build time (the test stack uses
-# Dockerfile.hosted.test, which is identical except for the `rc` tag). Unlike
+# Hosted-MCP image for the TEST Cloud 66 stack. Bakes @rundit-sdk/client
+# at the `rc` npm dist-tag at image-build time (the production stack uses
+# Dockerfile.hosted, which is identical except for the `latest` tag). Unlike
 # ./Dockerfile — which reinstalls the SDK on every container start — the result
 # is an immutable image: instant cold start, no npm egress at runtime.
 #
-# Redeploying (rebuilding) the stack picks up whatever `latest` points at at
+# Redeploying (rebuilding) the stack picks up whatever `rc` points at at
 # that moment; the build log prints `==> Baked @rundit-sdk/client@<version>`.
 
 FROM node:24-alpine
@@ -18,7 +18,7 @@ WORKDIR /app
 # it the install line is byte-identical between builds and a cached layer
 # would keep serving the previously resolved version. No build args, no
 # no-cache flag needed.
-ADD https://registry.npmjs.org/@rundit-sdk/client/latest /tmp/sdk-tag.json
+ADD https://registry.npmjs.org/@rundit-sdk/client/rc /tmp/sdk-tag.json
 
 COPY package.json package-lock.json ./
 # Install the lockfile, then move the SDK to the dist-tag. The override SAVES
@@ -26,9 +26,9 @@ COPY package.json package-lock.json ./
 # later `npm prune --omit=dev` reconciles against the lockfile and would roll a
 # --no-save install back to the pinned version. Those manifests live only in
 # this image and describe exactly what got baked.
-RUN echo "==> Target @rundit-sdk/client@latest = $(node -p 'require("/tmp/sdk-tag.json").version')" \
+RUN echo "==> Target @rundit-sdk/client@rc = $(node -p 'require("/tmp/sdk-tag.json").version')" \
  && npm ci --include=dev --no-audit --no-fund \
- && npm install --include=dev --no-audit --no-fund @rundit-sdk/client@latest \
+ && npm install --include=dev --no-audit --no-fund @rundit-sdk/client@rc \
  && echo "==> Baked @rundit-sdk/client@$(node -p 'require("./node_modules/@rundit-sdk/client/package.json").version')"
 
 COPY tsconfig.json ./

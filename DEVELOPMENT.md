@@ -140,23 +140,26 @@ Two consequences:
 
 ### Hosted deployment sync (Cloud 66)
 
-The hosted image ([`Dockerfile.hosted`](Dockerfile.hosted), built by Cloud 66
-BuildGrid via [`build.yml`](build.yml)) bakes the SDK at image-build time from
-a dist-tag held in the stack's **`HABITUS_RUNDIT_SDK_VERSION`** application
-environment variable — `rc` on the test stack, `latest` on the production
-stack. The `HABITUS_` prefix is mandatory: Cloud 66 only exposes app env vars
-to the Habitus build under that prefix (stripped inside Habitus), so an
-unprefixed `RUNDIT_SDK_VERSION` is invisible to the build and the image
-silently bakes the `package-lock.json` pin instead. `build.yml` forwards the
-value both as a Docker build arg (`_env(RUNDIT_SDK_VERSION)`) and as a Habitus
-env secret (`sdk_version`); the Dockerfile takes whichever is present and the
-build log prints `==> SDK version source: … -> '<value>'` followed by
-`==> Baked @rundit-sdk/client@<version>` — check those two lines first when
-the running server reports an unexpected tool count. Builds outside Cloud 66
-(`docker build`, or `--build-arg RUNDIT_SDK_VERSION=rc` to override) fall back
-to the exact version in `package-lock.json`. The step is `no_cache: true` so a
-redeploy always re-resolves the dist-tag instead of reusing the cached npm
-layer.
+The hosted image bakes the SDK at image-build time from an npm dist-tag. There
+is one Dockerfile per stack, identical except for the tag:
+
+| Stack | Dockerfile | Installs |
+|-------|------------|----------|
+| production | [`Dockerfile.hosted`](Dockerfile.hosted) | `@rundit-sdk/client@latest` |
+| test | [`Dockerfile.hosted.test`](Dockerfile.hosted.test) | `@rundit-sdk/client@rc` |
+
+Each Cloud 66 stack selects its file via `dockerfile_path` in its service.yml
+(`mcp` service). No build args, Habitus secrets, or stack env vars are
+involved — the tag is literally in the file. The build log prints
+`==> Baked @rundit-sdk/client@<version>`; check that line first when the
+running server reports an unexpected tool count. Layer caching cannot pin a
+stale version: each Dockerfile `ADD`s the npm registry manifest for its
+dist-tag (`registry.npmjs.org/@rundit-sdk/client/<tag>`) before the install,
+and Docker re-fetches ADD URLs on every build and keys the cache on their
+content, so a moved tag rebuilds the install layer automatically. The build
+log also prints `==> Target @rundit-sdk/client@<tag> = <version>` from that
+manifest; if Target and Baked disagree, the build reached the registry but
+`npm install` did not resolve the same tag.
 
 Deployments follow SDK releases automatically: after every publish,
 `rundit-sdk`'s publish workflow waits for npm to serve the new version on the
@@ -175,7 +178,7 @@ Consequences of tracking dist-tags:
   committed `tools.ts` describe local development, not what production runs —
   bump them periodically so review diffs stay meaningful.
 - Any Cloud 66 rebuild (e.g. a config redeploy) picks up whatever the tag
-  points at at that moment.
+  points at at that moment — `rc` on test, `latest` on production.
 - The deploy gate for a new SDK is the image build itself (codegen + `tsc`);
   the vitest suite only runs in this repo's CI against the pinned version.
 
