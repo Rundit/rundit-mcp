@@ -89,7 +89,6 @@ for (const [path, methods] of Object.entries(openapi.paths)) {
       method: method.toUpperCase(),
       path,
       pathParamNames: pathParams.map((p) => p.name),
-      queryParamNames: queryParams.map((p) => p.name),
       hasQuery: queryParams.length > 0,
       hasBody: !!body,
       inputSchema: {

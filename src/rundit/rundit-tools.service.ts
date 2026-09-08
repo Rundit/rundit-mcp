@@ -54,10 +54,10 @@ type ToolResult = {
   isError?: boolean;
 };
 
-export async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
+async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
   try {
     const data = await fn();
-    return { content: [{ type: 'text', text: JSON.stringify(data ?? null) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(data) }] };
   } catch (err) {
     if (err instanceof RunditSdkError) {
       return {

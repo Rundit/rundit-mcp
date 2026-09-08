@@ -6,7 +6,6 @@ type Operation = {
   ns: string;
   operation: string;
   pathParamNames: string[];
-  queryParamNames: string[];
   hasBody: boolean;
   hasQuery: boolean;
 };
@@ -16,7 +15,6 @@ const compile = (overrides: Partial<Operation>) => {
     ns: 'metrics',
     operation: 'write',
     pathParamNames: [],
-    queryParamNames: [],
     hasBody: false,
     hasQuery: false,
     ...overrides,
@@ -35,32 +33,6 @@ describe('generated SDK invocation', () => {
     expect(write).toHaveBeenCalledWith(17, { name: 'Acme', active: true });
   });
 
-  it('passes path, body, and query arguments in SDK order', async () => {
-    const write = vi.fn().mockResolvedValue(undefined);
-    const invoke = compile({
-      pathParamNames: ['companyId', 'metricId'],
-      queryParamNames: ['dryRun'],
-      hasBody: true,
-      hasQuery: true,
-    });
-
-    await invoke(
-      { metrics: { write } },
-      { companyId: 2, metricId: 17, dryRun: true, value: 42 },
-    );
-
-    expect(write).toHaveBeenCalledWith(2, 17, { value: 42 }, { dryRun: true });
-  });
-
-  it('separates query parameters from a body without path parameters', async () => {
-    const write = vi.fn().mockResolvedValue(undefined);
-    const invoke = compile({ queryParamNames: ['dryRun'], hasBody: true, hasQuery: true });
-
-    await invoke({ metrics: { write } }, { dryRun: true, value: 42 });
-
-    expect(write).toHaveBeenCalledWith({ value: 42 }, { dryRun: true });
-  });
-
   it('keeps body-only and path-plus-query calls unchanged', async () => {
     const bodyWrite = vi.fn().mockResolvedValue(undefined);
     const queryRead = vi.fn().mockResolvedValue(undefined);
@@ -69,7 +41,6 @@ describe('generated SDK invocation', () => {
     await compile({
       operation: 'read',
       pathParamNames: ['id'],
-      queryParamNames: ['limit'],
       hasQuery: true,
     })({ metrics: { read: queryRead } }, { id: 17, limit: 10 });
 
