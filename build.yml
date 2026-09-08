@@ -11,9 +11,11 @@
 # and it reaches Dockerfile.hosted through two channels, either of which is
 # enough (the build log prints which one won):
 #   1. `args` -> `_env(RUNDIT_SDK_VERSION)` -> Docker ARG RUNDIT_SDK_VERSION
-#   2. `secrets` -> Habitus secret `sdk_version` (type env, host var
-#      HABITUS_RUNDIT_SDK_VERSION) -> fetched inside the Dockerfile from the
-#      Habitus secrets endpoint (ARG habitus_host/habitus_port are injected)
+#   2. `secrets` -> Habitus secret `sdk_version` (type env, `value:
+#      RUNDIT_SDK_VERSION` = the name as seen INSIDE Habitus, i.e. the
+#      Cloud 66 app var HABITUS_RUNDIT_SDK_VERSION with its prefix stripped)
+#      -> fetched inside the Dockerfile from the Habitus secrets endpoint
+#      (ARG habitus_host/port/user/password are injected by Habitus)
 # A plain, unprefixed RUNDIT_SDK_VERSION app var is invisible to the build:
 # `_env()` then resolves to an empty string (no error) and the image silently
 # bakes the package-lock.json pin — which is what happened on 2026-09-08

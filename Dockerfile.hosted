@@ -28,10 +28,18 @@ ARG habitus_password=
 COPY package.json package-lock.json ./
 # Resolve the SDK version (see header), install, and log what got baked. One
 # RUN so the resolved value survives (shell variables do not cross RUN lines).
+# The Habitus fetch authenticates via a Basic header rather than user:pass@ in
+# the URL, so credentials with reserved URL characters work and the URL is
+# safe to appear in logs; the response is whitespace-trimmed (trailing newline)
+# before it reaches npm.
 RUN set -eu; \
     SDK_VERSION="$RUNDIT_SDK_VERSION"; SOURCE="build arg"; \
     if [ -z "$SDK_VERSION" ] && [ -n "$habitus_host" ]; then \
-      SDK_VERSION="$(wget -qO- "http://${habitus_user:+$habitus_user:$habitus_password@}$habitus_host:$habitus_port/v1/secrets/env/sdk_version" || true)"; \
+      AUTH="$(printf '%s:%s' "$habitus_user" "$habitus_password" | base64 | tr -d '\n')"; \
+      SDK_VERSION="$(wget -qO- --header "Authorization: Basic $AUTH" \
+        "http://$habitus_host:$habitus_port/v1/secrets/env/sdk_version" 2>/dev/null \
+        | tr -d '[:space:]' || true)"; \
+      unset AUTH; \
       SOURCE="habitus secret sdk_version"; \
     fi; \
     if [ -z "$SDK_VERSION" ]; then SOURCE="package-lock.json pin (no build arg, no habitus secret)"; fi; \
@@ -40,7 +48,8 @@ RUN set -eu; \
     if [ -n "$SDK_VERSION" ]; then \
       npm install --no-audit --no-fund "@rundit-sdk/client@${SDK_VERSION}"; \
     fi; \
-    echo "==> Baked @rundit-sdk/client@$(node -p "require('./node_modules/@rundit-sdk/client/package.json').version")"
+    BAKED="$(node -p 'require("./node_modules/@rundit-sdk/client/package.json").version')"; \
+    echo "==> Baked @rundit-sdk/client@$BAKED"
 
 COPY tsconfig.json ./
 COPY scripts ./scripts
