@@ -8,6 +8,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { invokeExpr } from './generate-invoke-expr.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -107,30 +108,6 @@ function describeTool(op) {
     return `${op.summary}\n\n${op.description}`;
   }
   return op.summary || op.description || op.name;
-}
-
-function invokeExpr(op) {
-  const ns = op.ns;
-  const fn = op.operation;
-  const pathNames = op.pathParamNames;
-
-  if (op.hasBody) {
-    return `(client, args) => client.${ns}.${fn}(args)`;
-  }
-  if (pathNames.length === 0 && op.hasQuery) {
-    return `(client, args) => client.${ns}.${fn}(args)`;
-  }
-  if (pathNames.length === 0) {
-    return `(client) => client.${ns}.${fn}()`;
-  }
-  if (op.hasQuery) {
-    const destructure = pathNames.join(', ');
-    const callArgs = pathNames.join(', ');
-    return `(client, { ${destructure}, ...query }) => client.${ns}.${fn}(${callArgs}, query)`;
-  }
-  const destructure = pathNames.join(', ');
-  const callArgs = pathNames.join(', ');
-  return `(client, { ${destructure} }) => client.${ns}.${fn}(${callArgs})`;
 }
 
 function indentJson(value, indent) {
