@@ -1,41 +1,40 @@
 #!/usr/bin/env bash
-# Installs the locally-built @rundit-sdk/client (as a symlink, so subsequent
-# sdk:generate runs in rundit-back propagate without re-installing),
-# regenerates the MCP tool manifest from its openapi.json, and compiles the
-# MCP server.
+# Local iteration loop for API changes across the three repos:
+#
+#   rundit-back  (npm run sdk:openapi)  ->  sdk-packages/openapi/sdk.openapi.json
+#   rundit-sdk   (spec/ + npm run sdk:generate)  ->  packages/client
+#   rundit-mcp   (npm link @rundit-sdk/client + codegen + tsc)  ->  dist/main.js
 #
 # Usage:
-#   ./scripts/build-local.sh                       # install local SDK + build
-#   ./scripts/build-local.sh --regen-sdk           # also runs sdk:generate in rundit-back first
-#   ./scripts/build-local.sh --skip-install        # only regen tools + tsc (no npm install)
-#   ./scripts/build-local.sh --sdk-path=<path>     # override SDK client location
-#   ./scripts/build-local.sh --back-dir=<path>     # override rundit-back location (used with --regen-sdk)
-#   ./scripts/build-local.sh --remove              # uninstall the locally-linked SDK
+#   ./scripts/build-local.sh                       # link ../rundit-sdk/packages/client, regen tools.ts, tsc
+#   ./scripts/build-local.sh --regen-sdk           # first regenerate the spec in rundit-back and the client in rundit-sdk
+#   ./scripts/build-local.sh --skip-link           # only regen tools.ts + tsc (link already in place)
+#   ./scripts/build-local.sh --sdk-dir=<path>      # override rundit-sdk checkout (default ../rundit-sdk)
+#   ./scripts/build-local.sh --back-dir=<path>     # override rundit-back checkout (default ../rundit-back)
+#   ./scripts/build-local.sh --remove              # drop the link and reinstall the pinned published SDK
 #
-# After this finishes successfully, register the MCP server with:
-#   ./scripts/register-mcp.sh
-#
-# Prerequisites:
-#   - rundit-back has run `npm run sdk:generate` (or pass --regen-sdk)
+# After this finishes successfully, run the server with `npm start` (http on :3002)
+# or register the stdio build with ./scripts/register-mcp.sh.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MCP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFAULT_BACK_DIR="$MCP_DIR/../rundit-back"
+DEFAULT_SDK_DIR="$MCP_DIR/../rundit-sdk"
 
 regen_sdk=false
-skip_install=false
+skip_link=false
 remove=false
-sdk_path=""
+sdk_dir=""
 back_dir=""
 
 for arg in "$@"; do
   case "$arg" in
     --regen-sdk)        regen_sdk=true ;;
-    --skip-install)     skip_install=true ;;
+    --skip-link)        skip_link=true ;;
     --remove)           remove=true ;;
-    --sdk-path=*)       sdk_path="${arg#*=}" ;;
+    --sdk-dir=*)        sdk_dir="${arg#*=}" ;;
     --back-dir=*)       back_dir="${arg#*=}" ;;
     --help|-h)
       sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
@@ -45,69 +44,54 @@ for arg in "$@"; do
   esac
 done
 
-resolved_back_dir=""
-if [ -n "$back_dir" ]; then
-  resolved_back_dir="$(cd "$back_dir" 2>/dev/null && pwd)" || {
-    echo "ERROR: --back-dir does not exist: $back_dir" >&2
+resolve_dir() {
+  local override="$1" fallback="$2" label="$3"
+  local candidate="${override:-$fallback}"
+  cd "$candidate" 2>/dev/null && pwd || {
+    echo "ERROR: $label not found at $candidate" >&2
     exit 1
   }
-elif [ -d "$DEFAULT_BACK_DIR" ]; then
-  resolved_back_dir="$(cd "$DEFAULT_BACK_DIR" && pwd)"
-fi
-
-resolve_sdk_path() {
-  if [ -n "$sdk_path" ]; then
-    cd "$sdk_path" 2>/dev/null && pwd
-    return
-  fi
-  [ -n "$resolved_back_dir" ] || return 1
-  cd "$resolved_back_dir/sdk-packages/client" 2>/dev/null && pwd
 }
 
 cd "$MCP_DIR"
 
 if $remove; then
-  echo "==> Removing locally-linked @rundit-sdk/client"
-  npm uninstall @rundit-sdk/client
-  echo "Done. Reinstall a published version with 'npm install' if needed."
+  echo "==> Unlinking @rundit-sdk/client and reinstalling the pinned version"
+  npm unlink --no-save @rundit-sdk/client >/dev/null 2>&1 || true
+  npm install
   exit 0
 fi
 
+resolved_sdk_dir="$(resolve_dir "$sdk_dir" "$DEFAULT_SDK_DIR" "rundit-sdk")"
+SDK_CLIENT_DIR="$resolved_sdk_dir/packages/client"
+
 if $regen_sdk; then
-  [ -n "$resolved_back_dir" ] || {
-    echo "ERROR: cannot run --regen-sdk: rundit-back not found at $DEFAULT_BACK_DIR (use --back-dir)" >&2
+  resolved_back_dir="$(resolve_dir "$back_dir" "$DEFAULT_BACK_DIR" "rundit-back")"
+  echo "==> Emitting the OpenAPI spec in $resolved_back_dir"
+  ( cd "$resolved_back_dir" && npm run sdk:openapi )
+  echo "==> Syncing the spec into $resolved_sdk_dir/spec and regenerating the client"
+  cp "$resolved_back_dir/sdk-packages/openapi/sdk.openapi.json" "$resolved_sdk_dir/spec/sdk.openapi.json"
+  ( cd "$resolved_sdk_dir" && npm run sdk:generate )
+fi
+
+if ! $skip_link; then
+  [ -f "$SDK_CLIENT_DIR/package.json" ] || {
+    echo "ERROR: generated client not found at $SDK_CLIENT_DIR" >&2
+    echo "  Run with --regen-sdk, or 'npm run sdk:generate' in $resolved_sdk_dir." >&2
     exit 1
   }
-  echo "==> Regenerating SDK in $resolved_back_dir"
-  ( cd "$resolved_back_dir" && npm run sdk:generate )
+  # A symlink, so later `sdk:generate` runs in rundit-sdk are visible here without
+  # reinstalling — the codegen reads node_modules/@rundit-sdk/client/openapi.json.
+  echo "==> Linking $SDK_CLIENT_DIR into node_modules"
+  ( cd "$SDK_CLIENT_DIR" && npm link >/dev/null )
+  npm link --no-save @rundit-sdk/client >/dev/null
+  [ -L "$MCP_DIR/node_modules/@rundit-sdk/client" ] || {
+    echo "WARN: node_modules/@rundit-sdk/client is not a symlink; later SDK regens will not propagate." >&2
+  }
 fi
 
-if ! $skip_install; then
-  SDK_CLIENT_DIR="$(resolve_sdk_path || true)"
-  if [ -z "$SDK_CLIENT_DIR" ] || [ ! -f "$SDK_CLIENT_DIR/package.json" ]; then
-    echo "ERROR: SDK client not found." >&2
-    echo "  Looked for: ${sdk_path:-${resolved_back_dir:-$DEFAULT_BACK_DIR}/sdk-packages/client}" >&2
-    echo "  Run with --regen-sdk to build it, or pass --sdk-path=<path>." >&2
-    exit 1
-  fi
-
-  # Drop any prior install so npm re-resolves cleanly. We intentionally do *not*
-  # pass --install-links — symlinking lets subsequent `sdk:generate` runs in
-  # rundit-back show up in node_modules immediately (the codegen reads
-  # node_modules/@rundit-sdk/client/openapi.json), so the user does not need to
-  # reinstall after every SDK regen.
-  echo "==> Installing local SDK client from $SDK_CLIENT_DIR"
-  rm -rf "$MCP_DIR/node_modules/@rundit-sdk/client"
-  npm install "$SDK_CLIENT_DIR"
-
-  if [ ! -L "$MCP_DIR/node_modules/@rundit-sdk/client" ]; then
-    echo "WARN: node_modules/@rundit-sdk/client is not a symlink." >&2
-    echo "      Future SDK regens in rundit-back will not propagate until you re-run this script." >&2
-  fi
-fi
-
-echo "==> Regenerating tools.ts and compiling MCP server"
+echo "==> Regenerating tools.ts and compiling the MCP server"
 npm run build
 
 echo ""
-echo "Build complete. Register with: ./scripts/register-mcp.sh"
+echo "Build complete. Run with 'npm start' (http, :3002) or register stdio via ./scripts/register-mcp.sh"
