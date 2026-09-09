@@ -28,6 +28,41 @@ async function request(method: string, params?: unknown) {
 }
 
 describe('metric lifecycle tools', () => {
+  it('preserves false for shape-only metric discovery', async () => {
+    upstream.mockClear();
+    await request('tools/call', { name: 'metrics_search', arguments: { companyGroupIds: [5], includePoints: false } });
+    const [, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ companyGroupIds: [5], includePoints: false });
+  });
+
+  it('sends a complete agent batch import without losing nested configuration or preview flags', async () => {
+    upstream.mockClear();
+    const args = { dryRun: true, onConflict: 'reject', companies: [{ companyId: 270, currency: 'USD', items: [
+      { metricTypeName: 'Revenue', points: [{ date: '2026-04-01', timeframe: 'Quarter', value: 980300, optionValue: null }] },
+      { createType: { name: 'Active Accounts', valueType: 'numeric', unit: 'Number', aggMethod: 'LAST_AVAILABLE', summaryAggregationMethods: ['SUM'] }, flavor: 'forecast', points: [{ date: '2026-07-01', timeframe: 'Month', value: 1500, optionValue: null }] },
+    ] }, { companyId: 271, currency: 'EUR', items: [{ metricTypeName: 'Revenue', points: [{ date: '2026-04-01', timeframe: 'Quarter', value: 123, optionValue: null }] }] }] };
+    const response = await request('tools/call', { name: 'metrics_import', arguments: args });
+    expect(response.result.isError).not.toBe(true);
+    const [url, init] = upstream.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('http://example.test/api/v2/sdk/metrics/import');
+    expect(JSON.parse(init.body as string)).toEqual(args);
+    const spec = TOOLS.find((tool) => tool.name === 'metrics_import')!;
+    const schema = z.object(schemaToZodShape(spec.inputSchema as JsonSchemaFragment));
+    expect(schema.safeParse({ ...args, companies: [] }).success).toBe(false);
+    expect(schema.safeParse({ ...args, companies: Array(101).fill(args.companies[0]) }).success).toBe(false);
+    expect(schema.safeParse({ ...args, companies: [{ ...args.companies[0], items: Array(51).fill(args.companies[0].items[0]) }] }).success).toBe(false);
+  });
+
+  it('passes metric type name searches to the generated SDK', async () => {
+    upstream.mockClear();
+    await request('tools/call', { name: 'metrics_get_types', arguments: { nameSearch: ['MRR', 'Revenue'], origin: 'Predefined', limit: 20 } });
+    const [url] = upstream.mock.calls[0] as unknown as [string];
+    expect(url).toContain('nameSearch');
+    expect(url).toContain('MRR');
+    expect(url).toContain('Revenue');
+    expect(url).toContain('origin=Predefined');
+  });
+
   it('publishes separate destructive operations with typed nested inputs', async () => {
     const response = await request('tools/list');
     for (const name of ['metrics_create_type', 'metrics_delete_type', 'metrics_delete', 'metrics_delete_points', 'metric_templates_create_entry', 'metric_templates_update_entry', 'metric_templates_delete_entry']) {

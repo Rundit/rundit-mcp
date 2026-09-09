@@ -9,6 +9,13 @@ export interface JsonSchemaFragment {
   properties?: Record<string, JsonSchemaFragment>;
   required?: string[];
   additionalProperties?: boolean;
+  minimum?: number;
+  maximum?: number;
+  minItems?: number;
+  maxItems?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
 }
 
 export type ZodRawShape = Record<string, ZodTypeAny>;
@@ -29,19 +36,30 @@ function schemaToZod(schema: JsonSchemaFragment): ZodTypeAny {
   let base: ZodTypeAny;
   switch (schema.type) {
     case 'string':
+      let text = z.string();
+      if (schema.minLength !== undefined) text = text.min(schema.minLength);
+      if (schema.maxLength !== undefined) text = text.max(schema.maxLength);
+      if (schema.pattern) text = text.regex(new RegExp(schema.pattern));
       base = schema.enum && schema.enum.length > 0
         ? z.enum(schema.enum as [string, ...string[]])
-        : z.string();
+        : text;
       break;
     case 'integer':
     case 'number':
-      base = z.number();
+      let number = z.number();
+      if (schema.type === 'integer') number = number.int();
+      if (schema.minimum !== undefined) number = number.min(schema.minimum);
+      if (schema.maximum !== undefined) number = number.max(schema.maximum);
+      base = number;
       break;
     case 'boolean':
       base = z.boolean();
       break;
     case 'array':
-      base = z.array(schema.items ? schemaToZod(schema.items) : z.unknown());
+      let array = z.array(schema.items ? schemaToZod(schema.items) : z.unknown());
+      if (schema.minItems !== undefined) array = array.min(schema.minItems);
+      if (schema.maxItems !== undefined) array = array.max(schema.maxItems);
+      base = array;
       break;
     case 'object':
       if (schema.properties) {
