@@ -1,10 +1,10 @@
 // AUTO-GENERATED FILE — DO NOT EDIT.
 // Regenerate with: npm run codegen
-// Source: @rundit-sdk/client v0.3.4 (openapi.json)
+// Source: @rundit-sdk/client v0.3.5 (openapi.json)
 
 import type { RunditClient } from '@rundit-sdk/client';
 
-export const SDK_VERSION = "0.3.4";
+export const SDK_VERSION = "0.3.5";
 
 export interface ToolSpec {
   name: string;
@@ -752,6 +752,114 @@ export const TOOLS: ToolSpec[] = [
       "additionalProperties": false
     },
     invoke: (client, { metricId, ...body }) => client.metrics.writePoints(metricId, body),
+  },
+  {
+    name: "metrics_write_points_batch",
+    description: "Upsert points for existing metrics across multiple companies\n\nPreferred for bulk writes: companies contains companyId, native currency and metric items selected by type id or exact name/shortName, optionally flavor actual/forecast/budget. No instance-id discovery needed. Upserts replace existing values like writePoints. Returns only company, metric and point counts. Does not create metric types, rows or template requests; missing rows return 404. VC API-key callers only; metrics:write and company edit permissions are required for every company. All company access, currencies, rows and point values are checked before writes begin. Limits: 100 companies, 50 items per company, 1000 items and 10000 points total, 250 points per item. Duplicate companies/rows/periods are rejected. Set exactly one of value or optionValue and the other to null. No implicit deletion or FX conversion. Unexpected persistence failures may leave earlier companies written; replaying the same values is safe.",
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "companies": {
+          "minItems": 1,
+          "maxItems": 100,
+          "description": "Each company may appear once. Maximum 1000 metric items and 10000 points across the request.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "companyId": {
+                "type": "number"
+              },
+              "currency": {
+                "type": "string",
+                "description": "Company native currency, e.g. USD. Writes do not convert FX."
+              },
+              "items": {
+                "minItems": 1,
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "metricTypeId": {
+                      "type": "number",
+                      "description": "Existing metric type id. Supply exactly one of metricTypeId or metricTypeName."
+                    },
+                    "metricTypeName": {
+                      "type": "string",
+                      "description": "Exact case-insensitive full name or shortName, e.g. MRR. Unknown or ambiguous names fail."
+                    },
+                    "flavor": {
+                      "type": "string",
+                      "enum": [
+                        "actual",
+                        "forecast",
+                        "budget"
+                      ],
+                      "default": "actual",
+                      "description": "Select an existing row. Missing forecast/budget rows are not created."
+                    },
+                    "points": {
+                      "minItems": 1,
+                      "maxItems": 250,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "Reporting period date (YYYY-MM-DD), on the first day of the month."
+                          },
+                          "value": {
+                            "type": "number",
+                            "nullable": true,
+                            "example": 123,
+                            "description": "Numeric value. Set to null for option metrics."
+                          },
+                          "optionValue": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": null,
+                            "description": "Option value. Set to null for numeric metrics."
+                          },
+                          "timeframe": {
+                            "type": "string",
+                            "enum": [
+                              "Month",
+                              "Quarter",
+                              "Year"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "value",
+                          "optionValue",
+                          "timeframe"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "points"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "companyId",
+              "currency",
+              "items"
+            ]
+          }
+        }
+      },
+      "required": [
+        "companies"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, args) => client.metrics.writePointsBatch(args),
   },
   {
     name: "positions_get_company_positions",
