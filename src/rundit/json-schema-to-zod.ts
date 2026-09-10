@@ -40,9 +40,13 @@ function schemaToZod(schema: JsonSchemaFragment): ZodTypeAny {
       if (schema.minLength !== undefined) text = text.min(schema.minLength);
       if (schema.maxLength !== undefined) text = text.max(schema.maxLength);
       if (schema.pattern) text = text.regex(new RegExp(schema.pattern));
-      base = schema.enum && schema.enum.length > 0
-        ? z.enum(schema.enum as [string, ...string[]])
-        : text;
+      base = text;
+      if (schema.enum && schema.enum.length > 0) {
+        const choices = z.enum(schema.enum as [string, ...string[]]);
+        base = schema.minLength !== undefined || schema.maxLength !== undefined || schema.pattern
+          ? text.and(choices)
+          : choices;
+      }
       break;
     case 'integer':
     case 'number':
