@@ -41,7 +41,7 @@ export class RunditToolsService {
     for (const { spec, inputSchema } of this.tools) {
       server.registerTool(
         spec.name,
-        { description: spec.description, inputSchema },
+        { description: spec.description, inputSchema, annotations: spec.annotations },
         (args) => safeCall(() => spec.invoke(client, args)),
       );
     }
@@ -57,7 +57,7 @@ type ToolResult = {
 async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
   try {
     const data = await fn();
-    return { content: [{ type: 'text', text: JSON.stringify(data) }] };
+    return { content: [{ type: 'text', text: JSON.stringify(data ?? null) }] };
   } catch (err) {
     if (err instanceof RunditSdkError) {
       return {
