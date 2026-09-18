@@ -24,6 +24,19 @@ const compile = (overrides: Partial<Operation>) => {
 };
 
 describe('generated SDK invocation', () => {
+  it('passes template path identifiers separately from configuration', async () => {
+    const updateEntry = vi.fn().mockResolvedValue({ id: 'entry' });
+    const invoke = compile({ ns: 'metricTemplates', operation: 'updateEntry', pathParamNames: ['templateId', 'entryId'], hasBody: true });
+    await invoke({ metricTemplates: { updateEntry } }, { templateId: 'template', entryId: 'entry', metricTypeId: 42, companyFilter: [{ type: 'all' }] });
+    expect(updateEntry).toHaveBeenCalledWith('template', 'entry', { metricTypeId: 42, companyFilter: [{ type: 'all' }] });
+  });
+
+  it('invokes template deletion with both identifiers and no body', async () => {
+    const deleteEntry = vi.fn().mockResolvedValue({ id: 'entry' });
+    const invoke = compile({ ns: 'metricTemplates', operation: 'deleteEntry', pathParamNames: ['templateId', 'entryId'] });
+    await invoke({ metricTemplates: { deleteEntry } }, { templateId: 'template', entryId: 'entry' });
+    expect(deleteEntry).toHaveBeenCalledWith('template', 'entry');
+  });
   it('separates path parameters from the request body', async () => {
     const write = vi.fn().mockResolvedValue(undefined);
     const invoke = compile({ pathParamNames: ['id'], hasBody: true });

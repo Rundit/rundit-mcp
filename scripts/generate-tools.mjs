@@ -130,6 +130,7 @@ out.push('');
 out.push('export interface ToolSpec {');
 out.push('  name: string;');
 out.push('  description: string;');
+out.push('  annotations: { readOnlyHint: boolean; destructiveHint: boolean };');
 out.push('  inputSchema: {');
 out.push("    type: 'object';");
 out.push('    properties: Record<string, unknown>;');
@@ -145,6 +146,8 @@ for (const op of operations) {
   out.push('  {');
   out.push(`    name: ${JSON.stringify(op.name)},`);
   out.push(`    description: ${JSON.stringify(describeTool(op))},`);
+  const readOnly = ['get', 'list', 'search', 'compare', 'aggregate'].some((prefix) => op.operation.startsWith(prefix));
+  out.push(`    annotations: ${JSON.stringify({ readOnlyHint: readOnly, destructiveHint: !readOnly })},`);
   out.push(`    inputSchema: ${indentJson(op.inputSchema, 4)},`);
   out.push(`    invoke: ${invokeExpr(op)},`);
   out.push('  },');
