@@ -78,4 +78,29 @@ describe('generated tools over HTTP', () => {
     expect(response.result).toEqual({ content: [{ type: 'text', text: 'null' }] });
     expect(write).toHaveBeenCalledExactlyOnceWith({ points });
   });
+
+  it('forwards profile PATCH values, including false and explicit null clears', async () => {
+    const id = '1d972df2-5c8d-4e82-9b11-40bc08484321';
+    for (const firstTimeFounder of [false, null]) {
+      upstream.mockReset().mockResolvedValueOnce(new Response('{}'));
+      const args = { id, companyId: 17, firstTimeFounder, position: null, country: null };
+      const response = await request('tools/call', { name: 'profiles_update', arguments: args });
+      expect(response.result.isError).not.toBe(true);
+      const [url, init] = upstream.mock.calls[0];
+      expect(url).toBe(`http://example.test/api/v2/sdk/profiles/${id}`);
+      expect(init?.method).toBe('PATCH');
+      expect(JSON.parse(init?.body as string)).toEqual({ companyId: 17, firstTimeFounder, position: null, country: null });
+    }
+  });
+
+  it('deletes profiles with a company context and handles 204 responses', async () => {
+    const id = '1d972df2-5c8d-4e82-9b11-40bc08484321';
+    upstream.mockReset().mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const response = await request('tools/call', { name: 'profiles_delete', arguments: { id, companyId: 17 } });
+    expect(response.result.isError).not.toBe(true);
+    const [url, init] = upstream.mock.calls[0];
+    expect(url).toBe(`http://example.test/api/v2/sdk/profiles/${id}?companyId=17`);
+    expect(init?.method).toBe('DELETE');
+    expect(init?.body).toBeUndefined();
+  });
 });

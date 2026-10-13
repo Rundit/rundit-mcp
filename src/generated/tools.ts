@@ -1,10 +1,10 @@
 // AUTO-GENERATED FILE — DO NOT EDIT.
 // Regenerate with: npm run codegen
-// Source: @rundit-sdk/client v0.3.5 (openapi.json)
+// Source: @rundit-sdk/client v0.3.3 (openapi.json)
 
 import type { RunditClient } from '@rundit-sdk/client';
 
-export const SDK_VERSION = "0.3.5";
+export const SDK_VERSION = "0.3.3";
 
 export interface ToolSpec {
   name: string;
@@ -396,6 +396,167 @@ export const TOOLS: ToolSpec[] = [
     invoke: (client, args) => client.companyReports.list(args),
   },
   {
+    name: "metric_templates_create_entry",
+    description: "Request a metric through the VC template\n\nCreates company metric rows or links existing rows for matching companies, and synchronizes forecast/budget requests. May notify companies. Selectors are OR-combined. Duplicate type entries return 409, never replace existing targeting. all targets the entire VC portfolio and requires a VC admin. Does not write point values.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string"
+        },
+        "metricTypeId": {
+          "type": "number",
+          "description": "Accessible predefined or VC-owned custom type. Cannot change on update."
+        },
+        "hasForecast": {
+          "type": "boolean"
+        },
+        "hasBudget": {
+          "type": "boolean"
+        },
+        "companyFilter": {
+          "minItems": 1,
+          "maxItems": 250,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "group",
+                  "company"
+                ],
+                "description": "Selectors are OR-combined. all means the whole VC portfolio and requires VC admin access."
+              },
+              "value": {
+                "type": "number",
+                "description": "Company or company-group id; omit for all."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        "position": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "templateId",
+        "metricTypeId",
+        "hasForecast",
+        "hasBudget",
+        "companyFilter"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { templateId, ...body }) => client.metricTemplates.createEntry(templateId, body),
+  },
+  {
+    name: "metric_templates_delete_entry",
+    description: "Stop requesting a metric through the template\n\nRemoves the template entry and unlinks this VC from matching company metrics and their forecast/budget rows. Preserves stored actual, forecast and budget data and other investors requests. Empty, unrequested rows may be removed. Does not delete the metric type. Use metrics.delete only for explicit data deletion.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string"
+        },
+        "entryId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "templateId",
+        "entryId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { templateId, entryId }) => client.metricTemplates.deleteEntry(templateId, entryId),
+  },
+  {
+    name: "metric_templates_get",
+    description: "Get the VC metric template\n\nUse template targeting to determine which metrics are currently requested from a company. A company row may remain after a request is removed; row existence alone is not request state. Returns the caller VC template and entries whose complete targeting is accessible. Entries define requested metric types, company/group filters and forecast/budget rows. An entry hidden due to wider targeting cannot be replaced by creating another entry for the same type.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    invoke: (client) => client.metricTemplates.get(),
+  },
+  {
+    name: "metric_templates_update_entry",
+    description: "Update a metric template entry\n\nReplaces targeting and requested forecast/budget flags. Requires access to both old and new targets. Keep metricTypeId unchanged. Removing companies stops requesting the metric; stored data is preserved. Does not change metric points or the custom type definition.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "templateId": {
+          "type": "string"
+        },
+        "entryId": {
+          "type": "string"
+        },
+        "metricTypeId": {
+          "type": "number",
+          "description": "Accessible predefined or VC-owned custom type. Cannot change on update."
+        },
+        "hasForecast": {
+          "type": "boolean"
+        },
+        "hasBudget": {
+          "type": "boolean"
+        },
+        "companyFilter": {
+          "minItems": 1,
+          "maxItems": 250,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "group",
+                  "company"
+                ],
+                "description": "Selectors are OR-combined. all means the whole VC portfolio and requires VC admin access."
+              },
+              "value": {
+                "type": "number",
+                "description": "Company or company-group id; omit for all."
+              }
+            },
+            "required": [
+              "type"
+            ]
+          }
+        },
+        "position": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "templateId",
+        "entryId",
+        "metricTypeId",
+        "hasForecast",
+        "hasBudget",
+        "companyFilter"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { templateId, entryId, ...body }) => client.metricTemplates.updateEntry(templateId, entryId, body),
+  },
+  {
     name: "metrics_aggregate",
     description: "Aggregate metrics across portfolio companies\n\nReturns aggregated metric values (SUM, AVG, MEDIAN, MIN, MAX, COUNT) across companies for each reporting period. Select metric types with `metricTypeIds` and/or `metricTypeNames` (case-insensitive exact match on name or `shortName`, e.g. \"MRR\"). Optionally group results by fund (`companyGroupId`) for fund-level breakdowns. MIN, MAX, and COUNT are always computed. SUM, AVG, and MEDIAN are only produced when the metric type enables them in its `summaryAggregationMethods` configuration; otherwise `point.value` is `null` for that aggregation. Every requested metric type the caller can access yields one entry (per fund when grouped) — with an empty `points` array when none of the selected companies has a value for it, so \"no data\" is explicit rather than a missing row. Ids that match no accessible metric type produce no entry. Select companies with `companyIds`, `companyNameSearch`, or `companyGroupIds`; when those select no company at all the response is an empty list. Ordered by fund id, then in the order the metric types were requested (`metricTypeIds` order; name-resolved types follow the catalogue order).",
     annotations: {"readOnlyHint":true,"destructiveHint":false},
@@ -591,8 +752,228 @@ export const TOOLS: ToolSpec[] = [
     invoke: (client, args) => client.metrics.compare(args),
   },
   {
+    name: "metrics_create_type",
+    description: "Create a VC-owned custom metric type\n\nCreates a definition only, not company rows. Add the returned type to a metric template to request it from companies. Ownership is derived from the API key user. Numeric, ranged numeric and option metrics are supported; formulas are not.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the custom metric definition. Does not create company rows."
+        },
+        "shortName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "valueType": {
+          "type": "string",
+          "enum": [
+            "numeric",
+            "option"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "Percentage",
+            "Currency",
+            "Number",
+            "Second",
+            "Minute",
+            "Hour",
+            "Day",
+            "Week",
+            "Month",
+            "Quarter",
+            "Year"
+          ],
+          "nullable": true,
+          "description": "Required for numeric metrics; omit for option metrics."
+        },
+        "aggMethod": {
+          "type": "string",
+          "enum": [
+            "SUM",
+            "LAST_AVAILABLE",
+            "AVG",
+            "NONE"
+          ],
+          "description": "Across-period aggregation. Option and ranged metrics require NONE."
+        },
+        "summaryAggregationMethods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "SUM",
+              "AVG",
+              "MEDIAN",
+              "COUNT_POSITIVES",
+              "AVG_POSITIVES_PERCENTAGE"
+            ]
+          }
+        },
+        "optionConfig": {
+          "type": "object",
+          "properties": {
+            "options": {
+              "minItems": 1,
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  },
+                  "isPositive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "value",
+                  "isPositive"
+                ]
+              }
+            }
+          },
+          "required": [
+            "options"
+          ]
+        },
+        "rangeConfig": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "step": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "min",
+            "max",
+            "step"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "valueType",
+        "aggMethod",
+        "summaryAggregationMethods"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, args) => client.metrics.createType(args),
+  },
+  {
+    name: "metrics_delete",
+    description: "Delete a company metric row and its data\n\nDestructively deletes the company row and all child forecast/budget rows and points. Requires company metric DELETE permission and rejects rows or children still requested by any investor with 409. Remove template requests first. Does not delete the metric type or edit a template. Missing rows return 404.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "metricId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricId }) => client.metrics.delete(metricId),
+  },
+  {
+    name: "metrics_delete_points",
+    description: "Delete selected metric points\n\nDeletes stored points identified by exact date and timeframe for one metric instance. Missing points are a no-op. Requires metric-value edit access; non-managed companies must explicitly grant investor metric editing. Does not delete the metric row, metric type, template entry, or underlying points of calculated aggregates. Calculated values may still appear on reads when other stored points can be aggregated. Returns remaining stored points within the requested date bounds.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricId": {
+          "type": "number"
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "description": "Reporting period date (YYYY-MM-DD), on the first day of the month."
+              },
+              "timeframe": {
+                "type": "string",
+                "enum": [
+                  "Month",
+                  "Quarter",
+                  "Year"
+                ]
+              }
+            },
+            "required": [
+              "date",
+              "timeframe"
+            ]
+          }
+        }
+      },
+      "required": [
+        "metricId",
+        "points"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricId, ...body }) => client.metrics.deletePoints(metricId, body),
+  },
+  {
+    name: "metrics_delete_type",
+    description: "Delete an unused custom metric type\n\nDeletes a VC-owned custom definition only when no company row or template entry references it. Returns 409 when in use. Does not cascade-delete company data or templates. Predefined types cannot be deleted.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricTypeId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "metricTypeId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricTypeId }) => client.metrics.deleteType(metricTypeId),
+  },
+  {
+    name: "metrics_get_type_usage",
+    description: "Get custom metric type usage\n\nReturns template usage and accessible companies with rows referencing this VC-owned custom type. Inaccessible company details are never returned. Deletion checks all references, including those outside the caller visibility.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "metricTypeId": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "metricTypeId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { metricTypeId }) => client.metrics.getTypeUsage(metricTypeId),
+  },
+  {
     name: "metrics_get_types",
-    description: "List metric types available to the SDK consumer\n\nReturns predefined metric types plus user-defined metric types scoped to the caller — VC group custom types for VC users, company custom types for company users. Each entry carries the metric shape needed to interpret values: `valueType` is `\"numeric\"` (read `point.value` as a number; may carry `rangeConfig` with min/max/step for ranged metrics) or `\"option\"` (read `point.optionValue` as a string from `optionConfig.options[]` — this is how boolean / yes-no metrics are encoded, as two options typically labelled \"Yes\"/\"No\"). `unit.unit` describes the measurement (`Currency`, `Percentage`, `Number`, time units, ...); `unit.currencyCode` is intentionally null on this endpoint because monetary types resolve their concrete currency per company — call /metrics to receive `unit.currencyCode` populated with each company's native currency, or pass `currency` to convert all monetary metrics to a chosen target. Filter with `nameSearch` (case-insensitive substring on name or `shortName`, OR across an array) to find a few types without paging the whole catalogue — e.g. `nameSearch=[\"mrr\",\"burn\"]`. Ordered by metric type id ascending.",
+    description: "Search metric types available to the SDK consumer\n\nReturns predefined metric types plus user-defined metric types scoped to the caller — VC group custom types for VC users, company custom types for company users. Each entry carries the metric shape needed to interpret values: `valueType` is `\"numeric\"` (read `point.value` as a number; may carry `rangeConfig` with min/max/step for ranged metrics) or `\"option\"` (read `point.optionValue` as a string from `optionConfig.options[]` — this is how boolean / yes-no metrics are encoded, as two options typically labelled \"Yes\"/\"No\"). `unit.unit` describes the measurement (`Currency`, `Percentage`, `Number`, time units, ...); `unit.currencyCode` is intentionally null on this endpoint because monetary types resolve their concrete currency per company — call /metrics to receive `unit.currencyCode` populated with each company's native currency, or pass `currency` to convert all monetary metrics to a chosen target. Filter with `nameSearch` (case-insensitive substring on name or `shortName`, OR across an array) to find a few types without paging the whole catalogue — e.g. `nameSearch=[\"mrr\",\"burn\"]`. Ordered by metric type id ascending.",
     annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
@@ -607,6 +988,13 @@ export const TOOLS: ToolSpec[] = [
           "type": "string",
           "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "Predefined",
+            "UserDefined"
+          ]
+        },
         "nameSearch": {
           "type": "array",
           "items": {
@@ -620,8 +1008,141 @@ export const TOOLS: ToolSpec[] = [
     invoke: (client, args) => client.metrics.getTypes(args),
   },
   {
+    name: "metrics_import",
+    description: "Import metrics across many companies in one call\n\nPreferred multi-company write operation. Every item supplies exactly one of metricTypeId, metricTypeName or createType; never combine selectors. provisionMissing defaults to true; set false for existing-row-only writes. For migration from writePointsBatch use onConflict=overwrite and provisionMissing=false, then handle per-item statuses. Requires metric-value edit access for every company; non-managed companies must explicitly grant investor metric editing. This grant only permits point values, not provisioning metric rows or changing templates. Writes immediately; there is no preview mode. Import a fund in one request: companies contains up to 100 companies, each with its native currency and up to 50 metric items; maximum 1000 items and 10000 points overall. Resolve types by id or exact name, optionally create custom definitions, request missing rows through the VC template, and write actual/forecast/budget points. No instance-id discovery needed. Rejects conflicting stored values unless overwrite is explicit. Access and currency are validated for all companies before writes. Results follow input order and return counts and ids, never point echoes. Each item is atomic; failed items roll back their database changes. The batch can partially succeed: check success and item statuses. Existing targeting is preserved. Dynamic scopes: metric-types:write for type creation, metric-templates:write for template changes. Replays reuse compatible types and skip identical points. Template changes can notify companies after commit; forecast/budget flags affect existing targets and require full targeting access. Dates are period starts. No formulas or forecast intervals.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "provisionMissing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow creation of missing definitions and template-requested rows. Set false for existing-row-only writes: missing types or flavors fail without provisioning. Creating definitions still requires createType explicitly. Default true preserves the provisioning workflow."
+        },
+        "companies": {
+          "minItems": 1,
+          "maxItems": 100,
+          "description": "Companies to import, each with its native source currency and metric items. Each company may appear once. Maximum 1000 metric items and 10000 points across the request. Access and currency are checked for every company before any writes.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "companyId": {
+                "type": "number",
+                "description": "One accessible portfolio company. New template targeting adds this company only; existing targeting is never replaced."
+              },
+              "currency": {
+                "type": "string",
+                "description": "Source currency, e.g. USD. Must equal company native currency. No implicit FX conversion on writes."
+              },
+              "items": {
+                "minItems": 1,
+                "maxItems": 50,
+                "description": "Each item must supply exactly one of metricTypeId, metricTypeName or createType, plus flavor and points.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "metricTypeId": {
+                      "type": "number",
+                      "description": "Use exactly one of metricTypeId, metricTypeName or createType."
+                    },
+                    "metricTypeName": {
+                      "type": "string",
+                      "description": "Use exactly one of metricTypeId, metricTypeName or createType. Exact case-insensitive name or shortName. Unknown or ambiguous names fail; no fuzzy writes."
+                    },
+                    "createType": {
+                      "description": "Use exactly one of metricTypeId, metricTypeName or createType. Create only if no accessible type matches the name and provisionMissing is true. Retries reuse a VC-owned full-name match with identical configuration; mismatches return a conflict.",
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/SdkCreateMetricTypeDto"
+                        }
+                      ]
+                    },
+                    "flavor": {
+                      "type": "string",
+                      "enum": [
+                        "actual",
+                        "forecast",
+                        "budget"
+                      ],
+                      "default": "actual"
+                    },
+                    "points": {
+                      "minItems": 1,
+                      "maxItems": 250,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "description": "Reporting period date (YYYY-MM-DD), on the first day of the month."
+                          },
+                          "value": {
+                            "type": "number",
+                            "nullable": true,
+                            "example": 123,
+                            "description": "Numeric value. Set to null for option metrics."
+                          },
+                          "optionValue": {
+                            "type": "string",
+                            "nullable": true,
+                            "example": null,
+                            "description": "Option value. Set to null for numeric metrics."
+                          },
+                          "timeframe": {
+                            "type": "string",
+                            "enum": [
+                              "Month",
+                              "Quarter",
+                              "Year"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "date",
+                          "value",
+                          "optionValue",
+                          "timeframe"
+                        ]
+                      }
+                    }
+                  },
+                  "description": "Supply exactly one of metricTypeId, metricTypeName or createType. Persisted type IDs identify distinct targets even when names match.",
+                  "required": [
+                    "points"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "companyId",
+              "currency",
+              "items"
+            ]
+          }
+        },
+        "onConflict": {
+          "type": "string",
+          "enum": [
+            "reject",
+            "overwrite"
+          ],
+          "default": "reject",
+          "description": "Default rejects an item if any stored point differs. Identical values are skipped on retries. overwrite explicitly replaces conflicting stored values."
+        }
+      },
+      "required": [
+        "companies"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, args) => client.metrics.import(args),
+  },
+  {
     name: "metrics_search",
-    description: "Read metric values for accessible companies, grouped by company\n\nReturns metric data points for companies the caller can access (companies in the caller's VC group portfolio, or the caller's own company for company users). Each entry carries company and metric type references with id and human-readable name. Each point carries both `value` (number, for `valueType === \"numeric\"`, including ranged numerics constrained by the type's `rangeConfig`) and `optionValue` (string, for `valueType === \"option\"`, matching one of `metricType.optionConfig.options[].value` — this is how boolean/yes-no metrics report their reading); read whichever matches the metric type's `valueType`. Each entry embeds a metric type *summary* (id, name, shortName, valueType, unit, plus option/range config when relevant); the full definition lives on /metrics/types. Filter by company id, company name substring (`companyNameSearch`), company group, metric type id, metric type name (`metricTypeNames` — case-insensitive exact match on either the full name or the `shortName`, so \"MRR\" and \"MRR - Monthly Recurring Revenue\" both work), timeframe, and date range to narrow the response. Pass `currency` (ISO 4217) to FX-convert monetary metrics to that target currency in one call instead of fetching company currencies separately. Use `pointLimit` to keep only the most recent N points per metric (`pointLimit: 1` = latest dated point; set `to` to today to exclude future values) — without it every historical point is returned, which can be very large across a portfolio. Entries are ordered by company id ascending — one entry per company, so `limit` pages whole companies, never partial metric lists.",
+    description: "Read metric values for accessible companies, grouped by company\n\nRow existence does not imply a current investor request: removing template targeting preserves reported data. Use metricTemplates.get and its company/group targeting to inspect request state; entries outside full targeting visibility are omitted, so absence from a restricted template response is not proof of no request. Returns metric data points for companies the caller can access (companies in the caller's VC group portfolio, or the caller's own company for company users). Each entry carries company and metric type references with id and human-readable name. Each point carries both `value` (number, for `valueType === \"numeric\"`, including ranged numerics constrained by the type's `rangeConfig`) and `optionValue` (string, for `valueType === \"option\"`, matching one of `metricType.optionConfig.options[].value` — this is how boolean/yes-no metrics report their reading); read whichever matches the metric type's `valueType`. Each entry embeds a metric type *summary* (id, name, shortName, valueType, unit, plus option/range config when relevant); the full definition lives on /metrics/types. Filter by company id, company name substring (`companyNameSearch`), company group, metric type id, metric type name (`metricTypeNames` — case-insensitive exact match on either the full name or the `shortName`, so \"MRR\" and \"MRR - Monthly Recurring Revenue\" both work), timeframe, and date range to narrow the response. Pass `currency` (ISO 4217) to FX-convert monetary metrics to that target currency in one call instead of fetching company currencies separately. Use `pointLimit` to keep only the most recent N points per metric (`pointLimit: 1` = latest dated point; set `to` to today to exclude future values) — without it every historical point is returned, which can be very large across a portfolio. Entries are ordered by company id ascending — one entry per company, so `limit` pages whole companies, never partial metric lists.",
     annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
@@ -635,6 +1156,11 @@ export const TOOLS: ToolSpec[] = [
         "cursor": {
           "type": "string",
           "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+        },
+        "includePoints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Set false to enumerate metric ids, types, units and forecast/budget rows without loading or computing point histories. Returns empty points arrays. Date/timeframe/pointLimit filters only apply when points are included."
         },
         "companyIds": {
           "description": "Restrict results to these companies. Defaults to all companies the caller can access.",
@@ -712,7 +1238,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "metrics_write_points",
-    description: "Upsert metric points\n\nWrites points for one metric instance. Set exactly one of value or optionValue according to the metric type and set the other field to null.",
+    description: "Upsert metric points\n\nWrites points for one metric instance. Requires metric-value edit access; non-managed companies must explicitly grant investor metric editing. Set exactly one of value or optionValue according to the metric type and set the other field to null.",
     annotations: {"readOnlyHint":false,"destructiveHint":true},
     inputSchema: {
       "type": "object",
@@ -769,7 +1295,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "metrics_write_points_batch",
-    description: "Upsert points for existing metrics across multiple companies\n\nPreferred for bulk writes: companies contains companyId, native currency and metric items selected by type id or exact name/shortName, optionally flavor actual/forecast/budget. No instance-id discovery needed. Upserts replace existing values like writePoints. Returns only company, metric and point counts. Does not create metric types, rows or template requests; missing rows return 404. VC API-key callers only; metrics:write and company edit permissions are required for every company. All company access, currencies, rows and point values are checked before writes begin. Limits: 100 companies, 50 items per company, 1000 items and 10000 points total, 250 points per item. Duplicate companies/rows/periods are rejected. Set exactly one of value or optionValue and the other to null. No implicit deletion or FX conversion. Unexpected persistence failures may leave earlier companies written; replaying the same values is safe.",
+    description: "Deprecated: upsert points for existing metrics across multiple companies\n\n@deprecated Use metrics.import; this operation will be removed in a future release.\n\nDeprecated; retained for compatibility and scheduled for future removal. Prefer metrics.import. For existing-row upserts use onConflict=overwrite and provisionMissing=false. Import writes immediately; requires metrics:write, metric-types:read and metric-templates:read; uses period-start dates; returns per-item results and can partially succeed, so inspect success and item statuses. This endpoint retains its existing behavior: companies contains companyId, native currency and metric items selected by type id or exact name/shortName, optionally flavor actual/forecast/budget. Upserts replace existing values. Returns company, metric and point counts. Does not create metric types, rows or template requests; missing rows return 404. VC API-key callers only; metrics:write and metric-value edit access are required for every company. Non-managed companies must explicitly grant investor metric editing. All access, currencies, rows and values are checked before writes begin. Limits: 100 companies, 50 items per company, 1000 items and 10000 points total, 250 points per item. Duplicate companies/rows/periods are rejected. Set exactly one of value or optionValue and the other to null. No deletion or FX conversion. Unexpected persistence failures may leave earlier companies written; replaying the same values is safe.",
     annotations: {"readOnlyHint":false,"destructiveHint":true},
     inputSchema: {
       "type": "object",
@@ -1045,6 +1571,577 @@ export const TOOLS: ToolSpec[] = [
       "additionalProperties": false
     },
     invoke: (client, args) => client.positions.getPortfolioSummary(args),
+  },
+  {
+    name: "profiles_create",
+    description: "Create a founder, management or board profile\n\nCreates a directory profile for a company. Requires name, companyId and at least one role or position. Optional fields default to null, including firstTimeFounder. Non-null firstTimeFounder requires the founder role. Uses profiles.getConfig option values. Managed-company and connected-company editing permissions apply.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "surname": {
+          "type": "string",
+          "nullable": true
+        },
+        "email": {
+          "type": "string",
+          "nullable": true
+        },
+        "telephone": {
+          "type": "string",
+          "nullable": true
+        },
+        "country": {
+          "type": "string",
+          "nullable": true,
+          "description": "Country of residence"
+        },
+        "avatarImageFileUuid": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true,
+          "description": "Existing uploaded avatar file UUID; null clears the avatar. This endpoint does not upload files."
+        },
+        "expertiseAreas": {
+          "type": "string",
+          "nullable": true
+        },
+        "educationLevel": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "school",
+            "high-school",
+            "college",
+            "associate",
+            "bachelor",
+            "master",
+            "professional",
+            "doctoral"
+          ]
+        },
+        "linkedIn": {
+          "type": "string",
+          "nullable": true
+        },
+        "github": {
+          "type": "string",
+          "nullable": true
+        },
+        "website": {
+          "type": "string",
+          "nullable": true
+        },
+        "gender": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "male",
+            "female",
+            "other",
+            "n/a"
+          ]
+        },
+        "birthYear": {
+          "type": "number",
+          "nullable": true
+        },
+        "race": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "white",
+            "american-indian",
+            "asian",
+            "black",
+            "pacific",
+            "two-or-more",
+            "other"
+          ]
+        },
+        "nationality": {
+          "type": "string",
+          "nullable": true,
+          "description": "Nationality value from profiles.getConfig"
+        },
+        "ethnicity": {
+          "type": "string",
+          "nullable": true
+        },
+        "twitter": {
+          "type": "string",
+          "nullable": true
+        },
+        "facebook": {
+          "type": "string",
+          "nullable": true
+        },
+        "rolesInCompany": {
+          "type": "array",
+          "description": "Replaces the categorical roles for the specified company. Omit to preserve them; null is invalid. At least one role or position must remain.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "founder-cofounder",
+              "management",
+              "board-member",
+              "board-chairman"
+            ]
+          }
+        },
+        "position": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "chief-executive",
+            "chief-operating",
+            "chief-financial",
+            "chief-information",
+            "chief-technology",
+            "chief-marketing",
+            "chief-human-resources",
+            "chief-design",
+            "chief-data",
+            "chief-product",
+            "chief-customer",
+            "chief-revenue",
+            "chief-sales",
+            "president",
+            "vice-president",
+            "cp-operatiojns",
+            "vp-finance",
+            "vp-technology",
+            "vp-marketing",
+            "vp-sales",
+            "vp-human-resources",
+            "vp-product",
+            "vp-design",
+            "vp-customer-support",
+            "cp-business-development",
+            "head-operations",
+            "head-finance",
+            "head-technology",
+            "head-marketing",
+            "head-human-resources",
+            "head-product",
+            "head-design",
+            "head-customer-support",
+            "head-business-development",
+            "lead-operations",
+            "lead-finance",
+            "lead-technology",
+            "lead-marketing",
+            "lead-human-resources",
+            "lead-product",
+            "lead-design",
+            "lead-customer-support",
+            "lead-business-development",
+            "chief-mobility-officer",
+            "evp-business-and-legal-affairs",
+            "global-general-manager",
+            "evp-internation-co-productions",
+            "chief-creation-officer",
+            "executive-chairman",
+            "chief-experience-n-strategy-officer",
+            "chief-corporate-officer",
+            "chief-of-staff",
+            "chief-people-officer",
+            "chief-privacy-officer",
+            "chief-legal-officer",
+            "svp-people-operations-n-experience",
+            "svp-marketing",
+            "svp-product-n-analytics",
+            "evp-strategic-partnerships",
+            "svp-of-sales",
+            "svp-strategic-initiatives",
+            "head-of-talent",
+            "head-of-partnerships",
+            "engineering-manager",
+            "director-of-customer-success",
+            "chief-compliance-officer",
+            "chief-strategy-officer",
+            "general-counsel",
+            "vp-engineering",
+            "director-of-engineering",
+            "chief-engineer",
+            "chief-medical-officer",
+            "executive-editor",
+            "managing-editor",
+            "vp-strategy-and-transformation",
+            "chief-business-officer",
+            "advisor",
+            "other"
+          ],
+          "description": "Company position. Omit to preserve; null clears it."
+        },
+        "firstTimeFounder": {
+          "type": "boolean",
+          "nullable": true,
+          "description": "True = Yes, false = No, null = Not specified. Omit to preserve. A non-null value requires the founder role."
+        },
+        "companyId": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "description": "Given name"
+        }
+      },
+      "required": [
+        "companyId",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, args) => client.profiles.create(args),
+  },
+  {
+    name: "profiles_delete",
+    description: "Delete a directory profile\n\nPermanently deletes the profile and all company role associations. Requires companyId matching the directory entry and delete permission for every associated company. Does not delete a platform user account.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "companyId": {
+          "type": "number",
+          "description": "Company context for this directory entry. Must match an existing association; profiles cannot be moved to another company."
+        }
+      },
+      "required": [
+        "id",
+        "companyId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { id, ...query }) => client.profiles.delete(id, query),
+  },
+  {
+    name: "profiles_get_config",
+    description: "Get allowed profile field values and labels\n\nReference data for directory CRUD: roles, positions, education levels, genders, races and nationalities. Contains no customer profiles. Use the option value, not its label, when writing.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    invoke: (client) => client.profiles.getConfig(),
+  },
+  {
+    name: "profiles_get_one",
+    description: "Get a full directory profile\n\nRequires the profile UUID and companyId from a directory entry. Returns all fields in that company context without disclosing other company associations.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "companyId": {
+          "type": "number",
+          "description": "Company context for this directory entry. Must match an existing association; profiles cannot be moved to another company."
+        }
+      },
+      "required": [
+        "id",
+        "companyId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { id, ...query }) => client.profiles.getOne(id, query),
+  },
+  {
+    name: "profiles_list",
+    description: "List the founders, management and board directory\n\nReturns full profile fields for accessible companies, one entry per profile and company. Filter by company ids, funds, company name, person name or recorded roles. Omitted roles returns the whole directory. Absence of a role means not recorded, not a verified negative. First-time-founder null means Not specified. Ordered by company id then profile UUID; supports limit/cursor pagination.",
+    annotations: {"readOnlyHint":true,"destructiveHint":false},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "minimum": 1,
+          "maximum": 500,
+          "type": "number",
+          "description": "Maximum items per page (1-500). Omit to receive the full result set in one response. Values outside that range are rejected with 422 rather than clamped, so a page is never quietly smaller than requested."
+        },
+        "cursor": {
+          "type": "string",
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+        },
+        "companyIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "companyGroupIds": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "Restrict to companies in these funds"
+        },
+        "companyNameSearch": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Case-insensitive company name substrings (OR)"
+        },
+        "nameSearch": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Case-insensitive person full-name substrings (OR)"
+        },
+        "rolesInCompany": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "founder-cofounder",
+              "management",
+              "board-member",
+              "board-chairman"
+            ]
+          },
+          "description": "Match any of these recorded roles; omitted returns the whole directory"
+        }
+      },
+      "additionalProperties": false
+    },
+    invoke: (client, args) => client.profiles.list(args),
+  },
+  {
+    name: "profiles_update",
+    description: "Partially update a directory profile\n\nPATCH semantics: omitted fields are preserved; null clears optional scalar fields, position or firstTimeFounder. Name cannot be cleared. rolesInCompany replaces only the specified company roles; other role fields are preserved when omitted. Removing founder status clears its first-time answer. At least one role or position must remain. companyId must be an existing association. Updates are atomic. Requires edit access to every company association because personal fields are shared.",
+    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    inputSchema: {
+      "type": "object",
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "surname": {
+          "type": "string",
+          "nullable": true
+        },
+        "email": {
+          "type": "string",
+          "nullable": true
+        },
+        "telephone": {
+          "type": "string",
+          "nullable": true
+        },
+        "country": {
+          "type": "string",
+          "nullable": true,
+          "description": "Country of residence"
+        },
+        "avatarImageFileUuid": {
+          "type": "string",
+          "format": "uuid",
+          "nullable": true,
+          "description": "Existing uploaded avatar file UUID; null clears the avatar. This endpoint does not upload files."
+        },
+        "expertiseAreas": {
+          "type": "string",
+          "nullable": true
+        },
+        "educationLevel": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "school",
+            "high-school",
+            "college",
+            "associate",
+            "bachelor",
+            "master",
+            "professional",
+            "doctoral"
+          ]
+        },
+        "linkedIn": {
+          "type": "string",
+          "nullable": true
+        },
+        "github": {
+          "type": "string",
+          "nullable": true
+        },
+        "website": {
+          "type": "string",
+          "nullable": true
+        },
+        "gender": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "male",
+            "female",
+            "other",
+            "n/a"
+          ]
+        },
+        "birthYear": {
+          "type": "number",
+          "nullable": true
+        },
+        "race": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "white",
+            "american-indian",
+            "asian",
+            "black",
+            "pacific",
+            "two-or-more",
+            "other"
+          ]
+        },
+        "nationality": {
+          "type": "string",
+          "nullable": true,
+          "description": "Nationality value from profiles.getConfig"
+        },
+        "ethnicity": {
+          "type": "string",
+          "nullable": true
+        },
+        "twitter": {
+          "type": "string",
+          "nullable": true
+        },
+        "facebook": {
+          "type": "string",
+          "nullable": true
+        },
+        "rolesInCompany": {
+          "type": "array",
+          "description": "Replaces the categorical roles for the specified company. Omit to preserve them; null is invalid. At least one role or position must remain.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "founder-cofounder",
+              "management",
+              "board-member",
+              "board-chairman"
+            ]
+          }
+        },
+        "position": {
+          "type": "string",
+          "nullable": true,
+          "enum": [
+            "chief-executive",
+            "chief-operating",
+            "chief-financial",
+            "chief-information",
+            "chief-technology",
+            "chief-marketing",
+            "chief-human-resources",
+            "chief-design",
+            "chief-data",
+            "chief-product",
+            "chief-customer",
+            "chief-revenue",
+            "chief-sales",
+            "president",
+            "vice-president",
+            "cp-operatiojns",
+            "vp-finance",
+            "vp-technology",
+            "vp-marketing",
+            "vp-sales",
+            "vp-human-resources",
+            "vp-product",
+            "vp-design",
+            "vp-customer-support",
+            "cp-business-development",
+            "head-operations",
+            "head-finance",
+            "head-technology",
+            "head-marketing",
+            "head-human-resources",
+            "head-product",
+            "head-design",
+            "head-customer-support",
+            "head-business-development",
+            "lead-operations",
+            "lead-finance",
+            "lead-technology",
+            "lead-marketing",
+            "lead-human-resources",
+            "lead-product",
+            "lead-design",
+            "lead-customer-support",
+            "lead-business-development",
+            "chief-mobility-officer",
+            "evp-business-and-legal-affairs",
+            "global-general-manager",
+            "evp-internation-co-productions",
+            "chief-creation-officer",
+            "executive-chairman",
+            "chief-experience-n-strategy-officer",
+            "chief-corporate-officer",
+            "chief-of-staff",
+            "chief-people-officer",
+            "chief-privacy-officer",
+            "chief-legal-officer",
+            "svp-people-operations-n-experience",
+            "svp-marketing",
+            "svp-product-n-analytics",
+            "evp-strategic-partnerships",
+            "svp-of-sales",
+            "svp-strategic-initiatives",
+            "head-of-talent",
+            "head-of-partnerships",
+            "engineering-manager",
+            "director-of-customer-success",
+            "chief-compliance-officer",
+            "chief-strategy-officer",
+            "general-counsel",
+            "vp-engineering",
+            "director-of-engineering",
+            "chief-engineer",
+            "chief-medical-officer",
+            "executive-editor",
+            "managing-editor",
+            "vp-strategy-and-transformation",
+            "chief-business-officer",
+            "advisor",
+            "other"
+          ],
+          "description": "Company position. Omit to preserve; null clears it."
+        },
+        "firstTimeFounder": {
+          "type": "boolean",
+          "nullable": true,
+          "description": "True = Yes, false = No, null = Not specified. Omit to preserve. A non-null value requires the founder role."
+        },
+        "companyId": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string",
+          "description": "Given name; cannot be cleared"
+        }
+      },
+      "required": [
+        "id",
+        "companyId"
+      ],
+      "additionalProperties": false
+    },
+    invoke: (client, { id, ...body }) => client.profiles.update(id, body),
   },
   {
     name: "transactions_get_company_transactions",
