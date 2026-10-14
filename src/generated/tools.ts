@@ -1707,21 +1707,25 @@ export const TOOLS: ToolSpec[] = [
       "properties": {
         "surname": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 100
         },
         "email": {
           "type": "string",
           "format": "email",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 320
         },
         "telephone": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 100
         },
         "country": {
           "type": "string",
           "nullable": true,
-          "description": "Country of residence"
+          "description": "Country of residence",
+          "maxLength": 200
         },
         "avatarImageFileUuid": {
           "type": "string",
@@ -1731,7 +1735,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "expertiseAreas": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 10000
         },
         "educationLevel": {
           "type": "string",
@@ -1751,19 +1756,22 @@ export const TOOLS: ToolSpec[] = [
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "github": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "website": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "gender": {
           "type": "string",
@@ -1801,22 +1809,26 @@ export const TOOLS: ToolSpec[] = [
         },
         "ethnicity": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 200
         },
         "twitter": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "facebook": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "rolesInCompany": {
           "type": "array",
+          "uniqueItems": true,
           "description": "Replaces the categorical roles for the specified company. Omit to preserve them; null is invalid. At least one role or position must remain.",
           "items": {
             "type": "string",
@@ -1919,11 +1931,14 @@ export const TOOLS: ToolSpec[] = [
           "description": "True = Yes, false = No, null = Not specified. Omit to preserve. A non-null value requires the founder role."
         },
         "companyId": {
-          "type": "number"
+          "type": "integer",
+          "minimum": 1
         },
         "name": {
           "type": "string",
-          "description": "Given name"
+          "description": "Given name",
+          "minLength": 1,
+          "maxLength": 100
         }
       },
       "required": [
@@ -2172,21 +2187,25 @@ export const TOOLS: ToolSpec[] = [
         },
         "surname": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 100
         },
         "email": {
           "type": "string",
           "format": "email",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 320
         },
         "telephone": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 100
         },
         "country": {
           "type": "string",
           "nullable": true,
-          "description": "Country of residence"
+          "description": "Country of residence",
+          "maxLength": 200
         },
         "avatarImageFileUuid": {
           "type": "string",
@@ -2196,7 +2215,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "expertiseAreas": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 10000
         },
         "educationLevel": {
           "type": "string",
@@ -2216,19 +2236,22 @@ export const TOOLS: ToolSpec[] = [
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "github": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "website": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "gender": {
           "type": "string",
@@ -2266,22 +2289,26 @@ export const TOOLS: ToolSpec[] = [
         },
         "ethnicity": {
           "type": "string",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 200
         },
         "twitter": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "facebook": {
           "type": "string",
           "format": "uri",
           "pattern": "^https?://",
-          "nullable": true
+          "nullable": true,
+          "maxLength": 2000
         },
         "rolesInCompany": {
           "type": "array",
+          "uniqueItems": true,
           "description": "Replaces the categorical roles for the specified company. Omit to preserve them; null is invalid. At least one role or position must remain.",
           "items": {
             "type": "string",
@@ -2384,11 +2411,14 @@ export const TOOLS: ToolSpec[] = [
           "description": "True = Yes, false = No, null = Not specified. Omit to preserve. A non-null value requires the founder role."
         },
         "companyId": {
-          "type": "number"
+          "type": "integer",
+          "minimum": 1
         },
         "name": {
           "type": "string",
-          "description": "Given name; cannot be cleared"
+          "description": "Given name; cannot be cleared",
+          "minLength": 1,
+          "maxLength": 100
         }
       },
       "required": [
