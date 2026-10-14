@@ -16,6 +16,7 @@ export interface JsonSchemaFragment {
   minLength?: number;
   maxLength?: number;
   pattern?: string;
+  format?: string;
 }
 
 export type ZodRawShape = Record<string, ZodTypeAny>;
@@ -25,21 +26,29 @@ export function schemaToZodShape(schema: JsonSchemaFragment): ZodRawShape {
   const required = new Set(schema.required ?? []);
   const shape: ZodRawShape = {};
   for (const [key, prop] of Object.entries(schema.properties)) {
-    let zodType = schemaToZod(prop);
+    let zodType = schemaToZod(prop, key);
     if (!required.has(key)) zodType = zodType.optional();
     shape[key] = zodType;
   }
   return shape;
 }
 
-function schemaToZod(schema: JsonSchemaFragment): ZodTypeAny {
+function schemaToZod(schema: JsonSchemaFragment, fieldName?: string): ZodTypeAny {
   let base: ZodTypeAny;
   switch (schema.type) {
     case 'string':
+      const isUrl = schema.format === 'uri' || schema.format === 'url';
+      const label = fieldName === 'linkedIn' ? 'LinkedIn' : fieldName === 'github' ? 'GitHub'
+        : fieldName ? fieldName[0].toUpperCase() + fieldName.slice(1) : 'Value';
+      const urlMessage = `${label} must be a valid ${schema.pattern === '^https?://' ? 'HTTP or HTTPS ' : ''}URL.`;
       let text = z.string();
+      if (['email', 'uri', 'url'].includes(schema.format ?? '')) text = text.trim();
       if (schema.minLength !== undefined) text = text.min(schema.minLength);
       if (schema.maxLength !== undefined) text = text.max(schema.maxLength);
-      if (schema.pattern) text = text.regex(new RegExp(schema.pattern));
+      if (schema.pattern) text = text.regex(new RegExp(schema.pattern), isUrl ? urlMessage : undefined);
+      if (schema.format === 'email') text = text.email();
+      if (isUrl) text = text.url(urlMessage);
+      if (schema.format === 'uuid') text = text.uuid();
       base = text;
       if (schema.enum && schema.enum.length > 0) {
         const choices = z.enum(schema.enum as [string, ...string[]]);
@@ -60,7 +69,7 @@ function schemaToZod(schema: JsonSchemaFragment): ZodTypeAny {
       base = z.boolean();
       break;
     case 'array':
-      let array = z.array(schema.items ? schemaToZod(schema.items) : z.unknown());
+      let array = z.array(schema.items ? schemaToZod(schema.items, fieldName) : z.unknown());
       if (schema.minItems !== undefined) array = array.min(schema.minItems);
       if (schema.maxItems !== undefined) array = array.max(schema.maxItems);
       base = array;
@@ -70,11 +79,11 @@ function schemaToZod(schema: JsonSchemaFragment): ZodTypeAny {
         const required = new Set(schema.required ?? []);
         const inner: ZodRawShape = {};
         for (const [k, p] of Object.entries(schema.properties)) {
-          let zt = schemaToZod(p);
+          let zt = schemaToZod(p, k);
           if (!required.has(k)) zt = zt.optional();
           inner[k] = zt;
         }
-        base = z.object(inner);
+        base = schema.additionalProperties === true ? z.object(inner).passthrough() : z.object(inner).strict();
       } else {
         base = z.record(z.string(), z.unknown());
       }

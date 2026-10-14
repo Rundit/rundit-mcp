@@ -32,13 +32,17 @@ function resolveRef(ref) {
 function expand(schema) {
   if (!schema || typeof schema !== 'object') return schema;
   if (schema.$ref) return expand(resolveRef(schema.$ref));
+  if (schema.allOf?.length === 1) {
+    const { allOf, ...rest } = schema;
+    return expand({ ...expand(allOf[0]), ...rest });
+  }
   if (schema.type === 'array' && schema.items) {
     return { ...schema, items: expand(schema.items) };
   }
   if (schema.type === 'object' && schema.properties) {
     const props = {};
     for (const [k, v] of Object.entries(schema.properties)) props[k] = expand(v);
-    return { ...schema, properties: props };
+    return { ...schema, properties: props, additionalProperties: schema.additionalProperties ?? false };
   }
   return schema;
 }
@@ -87,6 +91,7 @@ for (const [path, methods] of Object.entries(openapi.paths)) {
       summary: op.summary ?? '',
       description: op.description ?? null,
       method: method.toUpperCase(),
+      annotations: op['x-mcp-annotations'],
       path,
       pathParamNames: pathParams.map((p) => p.name),
       hasQuery: queryParams.length > 0,
@@ -147,7 +152,7 @@ for (const op of operations) {
   out.push(`    name: ${JSON.stringify(op.name)},`);
   out.push(`    description: ${JSON.stringify(describeTool(op))},`);
   const readOnly = ['get', 'list', 'search', 'compare', 'aggregate'].some((prefix) => op.operation.startsWith(prefix));
-  out.push(`    annotations: ${JSON.stringify({ readOnlyHint: readOnly, destructiveHint: !readOnly })},`);
+  out.push(`    annotations: ${JSON.stringify(op.annotations ?? { readOnlyHint: readOnly, destructiveHint: !readOnly })},`);
   out.push(`    inputSchema: ${indentJson(op.inputSchema, 4)},`);
   out.push(`    invoke: ${invokeExpr(op)},`);
   out.push('  },');

@@ -57,6 +57,12 @@ describe('generated tools over HTTP', () => {
     expect(response.result.tools).toContainEqual(expect.objectContaining({
       name: 'fixture_write', annotations: expect.objectContaining({ readOnlyHint: false, destructiveHint: true }),
     }));
+    expect(response.result.tools).toContainEqual(expect.objectContaining({
+      name: 'profiles_create', annotations: expect.objectContaining({ readOnlyHint: false, destructiveHint: false }),
+    }));
+    expect(response.result.tools).toContainEqual(expect.objectContaining({
+      name: 'profiles_delete', annotations: expect.objectContaining({ readOnlyHint: false, destructiveHint: true }),
+    }));
   });
 
   it('preserves explicit false in POST-based reads', async () => {
@@ -102,5 +108,52 @@ describe('generated tools over HTTP', () => {
     expect(url).toBe(`http://example.test/api/v2/sdk/profiles/${id}?companyId=17`);
     expect(init?.method).toBe('DELETE');
     expect(init?.body).toBeUndefined();
+  });
+
+  it.each([
+    ['profiles_update', { id: '1d972df2-5c8d-4e82-9b11-40bc08484321', companyId: 17, surName: 'Typo' }, 'surName'],
+    ['profiles_list', { plausibleButUnsupportedFilter: true }, 'plausibleButUnsupportedFilter'],
+    ['fixture_write', { points: [{ value: 0, optionValue: null, typo: true }] }, 'points.0.typo'],
+  ])('rejects unknown fields in %s without invoking the upstream API', async (name, args, field) => {
+    upstream.mockReset();
+    write.mockClear();
+    const response = await request('tools/call', { name, arguments: args });
+    expect(response.result.isError).toBe(true);
+    const error = JSON.parse(response.result.content[0].text);
+    expect(error).toMatchObject({ code: 'INVALID_ARGUMENTS', status: 422, body: null,
+      issues: expect.arrayContaining([expect.objectContaining({ field })]) });
+    expect(upstream).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('uses the same structured envelope for local validation and backend field errors', async () => {
+    const local = await request('tools/call', { name: 'profiles_list', arguments: { firstTimeFounder: 'true' } });
+    expect(local.result.isError).toBe(true);
+    const localError = JSON.parse(local.result.content[0].text);
+    expect(localError).toMatchObject({ code: 'INVALID_ARGUMENTS', status: 422,
+      issues: [expect.objectContaining({ field: 'firstTimeFounder' })] });
+    const body = { message: ['birthYear must not be later than the current year'],
+      errors: [{ field: 'birthYear', message: 'birthYear must not be later than the current year' }] };
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 422, headers: { 'Content-Type': 'application/json' } }));
+    const backend = await request('tools/call', { name: 'profiles_create', arguments: { companyId: 17,
+      name: 'Example', rolesInCompany: ['management'], birthYear: 3026 } });
+    const backendError = JSON.parse(backend.result.content[0].text);
+    expect(backendError).toEqual({ code: 'INVALID_ARGUMENTS', error: body.message[0], status: 422, issues: body.errors, body });
+    expect(Object.keys(backendError).sort()).toEqual(Object.keys(localError).sort());
+  });
+
+  it('explains the HTTP/HTTPS requirement for invalid website values', async () => {
+    upstream.mockReset();
+    for (const website of ['javascript:alert(1)', 'not-a-url']) {
+      const response = await request('tools/call', { name: 'profiles_create', arguments: {
+        companyId: 17, name: 'Example', rolesInCompany: ['management'], website,
+      } });
+      expect(response.result.isError).toBe(true);
+      const message = 'Website must be a valid HTTP or HTTPS URL.';
+      expect(JSON.parse(response.result.content[0].text)).toMatchObject({
+        error: message, issues: [{ field: 'website', message }],
+      });
+    }
+    expect(upstream).not.toHaveBeenCalled();
   });
 });

@@ -36,7 +36,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyIds": {
           "type": "array",
@@ -157,7 +157,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyIds": {
           "description": "Company identifiers to include in the batch.",
@@ -267,7 +267,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -341,7 +341,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "sortBy": {
           "default": "date",
@@ -438,7 +438,8 @@ export const TOOLS: ToolSpec[] = [
             },
             "required": [
               "type"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "position": {
@@ -536,7 +537,8 @@ export const TOOLS: ToolSpec[] = [
             },
             "required": [
               "type"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "position": {
@@ -571,7 +573,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "metricTypeIds": {
           "description": "Metric type identifiers to aggregate (discover ids via /metrics/types). Entries are returned in this order. Required unless `metricTypeNames` is given; intersected with it when both are given.",
@@ -836,13 +838,15 @@ export const TOOLS: ToolSpec[] = [
                 "required": [
                   "value",
                   "isPositive"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
           "required": [
             "options"
-          ]
+          ],
+          "additionalProperties": false
         },
         "rangeConfig": {
           "type": "object",
@@ -861,7 +865,8 @@ export const TOOLS: ToolSpec[] = [
             "min",
             "max",
             "step"
-          ]
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -923,7 +928,8 @@ export const TOOLS: ToolSpec[] = [
             "required": [
               "date",
               "timeframe"
-            ]
+            ],
+            "additionalProperties": false
           }
         }
       },
@@ -986,7 +992,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "origin": {
           "type": "string",
@@ -1052,12 +1058,125 @@ export const TOOLS: ToolSpec[] = [
                       "description": "Use exactly one of metricTypeId, metricTypeName or createType. Exact case-insensitive name or shortName. Unknown or ambiguous names fail; no fuzzy writes."
                     },
                     "createType": {
-                      "description": "Use exactly one of metricTypeId, metricTypeName or createType. Create only if no accessible type matches the name and provisionMissing is true. Retries reuse a VC-owned full-name match with identical configuration; mismatches return a conflict.",
-                      "allOf": [
-                        {
-                          "$ref": "#/components/schemas/SdkCreateMetricTypeDto"
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Name of the custom metric definition. Does not create company rows."
+                        },
+                        "shortName": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "valueType": {
+                          "type": "string",
+                          "enum": [
+                            "numeric",
+                            "option"
+                          ]
+                        },
+                        "unit": {
+                          "type": "string",
+                          "enum": [
+                            "Percentage",
+                            "Currency",
+                            "Number",
+                            "Second",
+                            "Minute",
+                            "Hour",
+                            "Day",
+                            "Week",
+                            "Month",
+                            "Quarter",
+                            "Year"
+                          ],
+                          "nullable": true,
+                          "description": "Required for numeric metrics; omit for option metrics."
+                        },
+                        "aggMethod": {
+                          "type": "string",
+                          "enum": [
+                            "SUM",
+                            "LAST_AVAILABLE",
+                            "AVG",
+                            "NONE"
+                          ],
+                          "description": "Across-period aggregation. Option and ranged metrics require NONE."
+                        },
+                        "summaryAggregationMethods": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "SUM",
+                              "AVG",
+                              "MEDIAN",
+                              "COUNT_POSITIVES",
+                              "AVG_POSITIVES_PERCENTAGE"
+                            ]
+                          }
+                        },
+                        "optionConfig": {
+                          "type": "object",
+                          "properties": {
+                            "options": {
+                              "minItems": 1,
+                              "maxItems": 100,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "value": {
+                                    "type": "string"
+                                  },
+                                  "isPositive": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "value",
+                                  "isPositive"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "options"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "rangeConfig": {
+                          "type": "object",
+                          "properties": {
+                            "min": {
+                              "type": "number"
+                            },
+                            "max": {
+                              "type": "number"
+                            },
+                            "step": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "min",
+                            "max",
+                            "step"
+                          ],
+                          "additionalProperties": false
                         }
-                      ]
+                      },
+                      "required": [
+                        "name",
+                        "valueType",
+                        "aggMethod",
+                        "summaryAggregationMethods"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Use exactly one of metricTypeId, metricTypeName or createType. Create only if no accessible type matches the name and provisionMissing is true. Retries reuse a VC-owned full-name match with identical configuration; mismatches return a conflict."
                     },
                     "flavor": {
                       "type": "string",
@@ -1105,14 +1224,16 @@ export const TOOLS: ToolSpec[] = [
                           "value",
                           "optionValue",
                           "timeframe"
-                        ]
+                        ],
+                        "additionalProperties": false
                       }
                     }
                   },
                   "description": "Supply exactly one of metricTypeId, metricTypeName or createType. Persisted type IDs identify distinct targets even when names match.",
                   "required": [
                     "points"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             },
@@ -1120,7 +1241,8 @@ export const TOOLS: ToolSpec[] = [
               "companyId",
               "currency",
               "items"
-            ]
+            ],
+            "additionalProperties": false
           }
         },
         "onConflict": {
@@ -1155,7 +1277,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "includePoints": {
           "type": "boolean",
@@ -1281,7 +1403,8 @@ export const TOOLS: ToolSpec[] = [
               "value",
               "optionValue",
               "timeframe"
-            ]
+            ],
+            "additionalProperties": false
           }
         }
       },
@@ -1377,13 +1500,15 @@ export const TOOLS: ToolSpec[] = [
                           "value",
                           "optionValue",
                           "timeframe"
-                        ]
+                        ],
+                        "additionalProperties": false
                       }
                     }
                   },
                   "required": [
                     "points"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             },
@@ -1391,7 +1516,8 @@ export const TOOLS: ToolSpec[] = [
               "companyId",
               "currency",
               "items"
-            ]
+            ],
+            "additionalProperties": false
           }
         }
       },
@@ -1421,7 +1547,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -1499,7 +1625,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "groupBy": {
           "default": "CompanyGroup",
@@ -1575,7 +1701,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "profiles_create",
     description: "Create a founder, management or board profile\n\nCreates a directory profile for a company. Requires name, companyId and at least one role or position. Optional fields default to null, including firstTimeFounder. Non-null firstTimeFounder requires the founder role. Uses profiles.getConfig option values. Managed-company and connected-company editing permissions apply.",
-    annotations: {"readOnlyHint":false,"destructiveHint":true},
+    annotations: {"readOnlyHint":false,"destructiveHint":false},
     inputSchema: {
       "type": "object",
       "properties": {
@@ -1585,6 +1711,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "email": {
           "type": "string",
+          "format": "email",
           "nullable": true
         },
         "telephone": {
@@ -1622,14 +1749,20 @@ export const TOOLS: ToolSpec[] = [
         },
         "linkedIn": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "github": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "website": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "gender": {
@@ -1643,8 +1776,10 @@ export const TOOLS: ToolSpec[] = [
           ]
         },
         "birthYear": {
-          "type": "number",
-          "nullable": true
+          "type": "integer",
+          "minimum": 1,
+          "nullable": true,
+          "description": "Year of birth; cannot be later than the current year"
         },
         "race": {
           "type": "string",
@@ -1670,10 +1805,14 @@ export const TOOLS: ToolSpec[] = [
         },
         "twitter": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "facebook": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "rolesInCompany": {
@@ -1708,7 +1847,7 @@ export const TOOLS: ToolSpec[] = [
             "chief-sales",
             "president",
             "vice-president",
-            "cp-operatiojns",
+            "vp-operations",
             "vp-finance",
             "vp-technology",
             "vp-marketing",
@@ -1717,7 +1856,7 @@ export const TOOLS: ToolSpec[] = [
             "vp-product",
             "vp-design",
             "vp-customer-support",
-            "cp-business-development",
+            "vp-business-development",
             "head-operations",
             "head-finance",
             "head-technology",
@@ -1739,8 +1878,8 @@ export const TOOLS: ToolSpec[] = [
             "chief-mobility-officer",
             "evp-business-and-legal-affairs",
             "global-general-manager",
-            "evp-internation-co-productions",
-            "chief-creation-officer",
+            "evp-international-co-productions",
+            "chief-creative-officer",
             "executive-chairman",
             "chief-experience-n-strategy-officer",
             "chief-corporate-officer",
@@ -1772,7 +1911,7 @@ export const TOOLS: ToolSpec[] = [
             "advisor",
             "other"
           ],
-          "description": "Company position. Omit to preserve; null clears it."
+          "description": "Company position. Omit to preserve; null clears it. Use a value from profiles.getConfig."
         },
         "firstTimeFounder": {
           "type": "boolean",
@@ -1821,14 +1960,30 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "profiles_get_config",
-    description: "Get allowed profile field values and labels\n\nReference data for directory CRUD: roles, positions, education levels, genders, races and nationalities. Contains no customer profiles. Use the option value, not its label, when writing.",
+    description: "Get allowed profile field values and labels\n\nReference data for directory CRUD: roles, positions, education levels, genders, races and nationalities. Use sections to request only what you need (e.g. [\"roles\",\"positions\"]); omitted or [] returns the complete config. Contains no customer profiles. Use the option value, not its label, when writing.",
     annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "roles",
+              "positions",
+              "educationLevels",
+              "genders",
+              "races",
+              "nationalities"
+            ]
+          },
+          "description": "Return only these reference-data sections. Omit or pass [] for the complete config."
+        }
+      },
       "additionalProperties": false
     },
-    invoke: (client) => client.profiles.getConfig(),
+    invoke: (client, args) => client.profiles.getConfig(args),
   },
   {
     name: "profiles_get_one",
@@ -1856,7 +2011,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "profiles_list",
-    description: "List the founders, management and board directory\n\nReturns full profile fields for accessible companies, one entry per profile and company. Filter by company ids, funds, company name, person name or recorded roles. Omitted roles returns the whole directory. Absence of a role means not recorded, not a verified negative. First-time-founder null means Not specified. Ordered by company id then profile UUID; supports limit/cursor pagination.",
+    description: "List the founders, management and board directory\n\nReturns full profile fields for accessible companies, one entry per profile and company. Filter by company ids, funds, company name, person name, recorded roles, firstTimeFounder or position. Filters intersect. firstTimeFounder=false matches recorded No answers only, not unknown answers or non-founders. Omitted roles returns the whole directory. Absence of a role means not recorded, not a verified negative. First-time-founder null means Not specified. Ordered by company id then profile UUID; repeat the original filters when passing the next cursor. Existing legacy free-text values remain readable; format validation applies to supplied write fields.",
     annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
@@ -1869,7 +2024,95 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+        },
+        "firstTimeFounder": {
+          "type": "boolean",
+          "description": "Filter founders by a recorded Yes/No answer. false does not match unknown answers or non-founders."
+        },
+        "position": {
+          "type": "string",
+          "enum": [
+            "chief-executive",
+            "chief-operating",
+            "chief-financial",
+            "chief-information",
+            "chief-technology",
+            "chief-marketing",
+            "chief-human-resources",
+            "chief-design",
+            "chief-data",
+            "chief-product",
+            "chief-customer",
+            "chief-revenue",
+            "chief-sales",
+            "president",
+            "vice-president",
+            "vp-operations",
+            "vp-finance",
+            "vp-technology",
+            "vp-marketing",
+            "vp-sales",
+            "vp-human-resources",
+            "vp-product",
+            "vp-design",
+            "vp-customer-support",
+            "vp-business-development",
+            "head-operations",
+            "head-finance",
+            "head-technology",
+            "head-marketing",
+            "head-human-resources",
+            "head-product",
+            "head-design",
+            "head-customer-support",
+            "head-business-development",
+            "lead-operations",
+            "lead-finance",
+            "lead-technology",
+            "lead-marketing",
+            "lead-human-resources",
+            "lead-product",
+            "lead-design",
+            "lead-customer-support",
+            "lead-business-development",
+            "chief-mobility-officer",
+            "evp-business-and-legal-affairs",
+            "global-general-manager",
+            "evp-international-co-productions",
+            "chief-creative-officer",
+            "executive-chairman",
+            "chief-experience-n-strategy-officer",
+            "chief-corporate-officer",
+            "chief-of-staff",
+            "chief-people-officer",
+            "chief-privacy-officer",
+            "chief-legal-officer",
+            "svp-people-operations-n-experience",
+            "svp-marketing",
+            "svp-product-n-analytics",
+            "evp-strategic-partnerships",
+            "svp-of-sales",
+            "svp-strategic-initiatives",
+            "head-of-talent",
+            "head-of-partnerships",
+            "engineering-manager",
+            "director-of-customer-success",
+            "chief-compliance-officer",
+            "chief-strategy-officer",
+            "general-counsel",
+            "vp-engineering",
+            "director-of-engineering",
+            "chief-engineer",
+            "chief-medical-officer",
+            "executive-editor",
+            "managing-editor",
+            "vp-strategy-and-transformation",
+            "chief-business-officer",
+            "advisor",
+            "other"
+          ],
+          "description": "Filter by a company position from profiles.getConfig."
         },
         "companyIds": {
           "type": "array",
@@ -1933,6 +2176,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "email": {
           "type": "string",
+          "format": "email",
           "nullable": true
         },
         "telephone": {
@@ -1970,14 +2214,20 @@ export const TOOLS: ToolSpec[] = [
         },
         "linkedIn": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "github": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "website": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "gender": {
@@ -1991,8 +2241,10 @@ export const TOOLS: ToolSpec[] = [
           ]
         },
         "birthYear": {
-          "type": "number",
-          "nullable": true
+          "type": "integer",
+          "minimum": 1,
+          "nullable": true,
+          "description": "Year of birth; cannot be later than the current year"
         },
         "race": {
           "type": "string",
@@ -2018,10 +2270,14 @@ export const TOOLS: ToolSpec[] = [
         },
         "twitter": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "facebook": {
           "type": "string",
+          "format": "uri",
+          "pattern": "^https?://",
           "nullable": true
         },
         "rolesInCompany": {
@@ -2056,7 +2312,7 @@ export const TOOLS: ToolSpec[] = [
             "chief-sales",
             "president",
             "vice-president",
-            "cp-operatiojns",
+            "vp-operations",
             "vp-finance",
             "vp-technology",
             "vp-marketing",
@@ -2065,7 +2321,7 @@ export const TOOLS: ToolSpec[] = [
             "vp-product",
             "vp-design",
             "vp-customer-support",
-            "cp-business-development",
+            "vp-business-development",
             "head-operations",
             "head-finance",
             "head-technology",
@@ -2087,8 +2343,8 @@ export const TOOLS: ToolSpec[] = [
             "chief-mobility-officer",
             "evp-business-and-legal-affairs",
             "global-general-manager",
-            "evp-internation-co-productions",
-            "chief-creation-officer",
+            "evp-international-co-productions",
+            "chief-creative-officer",
             "executive-chairman",
             "chief-experience-n-strategy-officer",
             "chief-corporate-officer",
@@ -2120,7 +2376,7 @@ export const TOOLS: ToolSpec[] = [
             "advisor",
             "other"
           ],
-          "description": "Company position. Omit to preserve; null clears it."
+          "description": "Company position. Omit to preserve; null clears it. Use a value from profiles.getConfig."
         },
         "firstTimeFounder": {
           "type": "boolean",
@@ -2162,7 +2418,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -2227,7 +2483,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
@@ -2287,7 +2543,7 @@ export const TOOLS: ToolSpec[] = [
         },
         "cursor": {
           "type": "string",
-          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Carries the page size it was issued with, so a follow-up call needs only the cursor. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
+          "description": "Opaque cursor from a previous response's `meta.nextCursor`. Repeat the original filters and pass nextCursor as cursor; limit can be omitted because the cursor carries its page size. Valid solely for the endpoint, filters, and caller that produced it — change any of them and you get 422; start again without a cursor. Paging reflects the data as of each request, so rows added or removed mid-walk can shift positions."
         },
         "companyGroupIds": {
           "type": "array",
