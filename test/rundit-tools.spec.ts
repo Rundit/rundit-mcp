@@ -5,6 +5,8 @@ import type { Server } from 'node:http';
 import { RunditToolsService } from '../src/rundit/rundit-tools.service.js';
 import { startHttpServer } from '../src/http-server.js';
 import type { RunditService } from '../src/rundit/rundit.service.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 
 const write = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('../src/generated/tools.js', async (importOriginal) => {
@@ -47,6 +49,43 @@ async function request(method: string, params?: unknown) {
 }
 
 describe('generated tools over HTTP', () => {
+  it('applies task rejection to non-HTTP transports too', async () => {
+    const [serverTransport, peer] = InMemoryTransport.createLinkedPair();
+    const mcp = new RunditToolsService().createServer(client);
+    try {
+      const response = new Promise<JSONRPCMessage>((resolve) => { peer.onmessage = resolve; });
+      await mcp.connect(serverTransport);
+      await peer.start();
+      await peer.send({ jsonrpc: '2.0', id: 42, method: 'tools/call', params: {
+        name: 'profiles_list', arguments: {}, task: { ttl: 60000 },
+      } });
+      expect(await response).toMatchObject({ id: 42, error: { code: -32602,
+        data: { code: 'INVALID_ARGUMENTS', status: 422, error: 'Task execution is not supported' } } });
+    } finally {
+      await mcp.close();
+      await peer.close();
+    }
+  });
+
+  it.each(['profiles_list', 'unknown_tool'])('rejects task-augmented calls for %s with structured protocol error data', async (name) => {
+    upstream.mockReset();
+    const response = await request('tools/call', { name, arguments: {}, task: { ttl: 60000 } });
+    expect(response.error).toMatchObject({ code: -32602,
+      data: { code: 'INVALID_ARGUMENTS', error: 'Task execution is not supported', status: 422, issues: [], body: null } });
+    expect(response.error.message).not.toContain('Invalid task creation result');
+    expect(response.result).toBeUndefined();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('accepts uppercase HTTP schemes from the generated profile schema', async () => {
+    upstream.mockReset().mockResolvedValueOnce(new Response('{}'));
+    const response = await request('tools/call', { name: 'profiles_create', arguments: {
+      companyId: 17, name: 'Example', rolesInCompany: ['management'], website: 'HTTPS://example.com',
+    } });
+    expect(response.result.isError).not.toBe(true);
+    expect(upstream).toHaveBeenCalledOnce();
+  });
+
   it('publishes safety hints for reads, POST-based reads and writes', async () => {
     const response = await request('tools/list');
     for (const name of ['companies_get_all', 'metrics_search', 'metrics_compare', 'metrics_aggregate']) {

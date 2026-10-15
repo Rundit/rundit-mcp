@@ -40,7 +40,8 @@ function schemaToZod(schema: JsonSchemaFragment, fieldName?: string): ZodTypeAny
       const isUrl = schema.format === 'uri' || schema.format === 'url';
       const label = fieldName === 'linkedIn' ? 'LinkedIn' : fieldName === 'github' ? 'GitHub'
         : fieldName ? fieldName[0].toUpperCase() + fieldName.slice(1) : 'Value';
-      const urlMessage = `${label} must be a valid ${schema.pattern === '^https?://' ? 'HTTP or HTTPS ' : ''}URL.`;
+      const httpOnly = ['^https?://', '^[Hh][Tt][Tt][Pp][Ss]?://', '^[Hh][Tt][Tt][Pp][Ss]?:'].includes(schema.pattern ?? '');
+      const urlMessage = `${label} must be a valid ${httpOnly ? 'HTTP or HTTPS ' : ''}URL.`;
       let text = z.string();
       if (['email', 'uri', 'url'].includes(schema.format ?? '')) text = text.trim();
       if (schema.minLength !== undefined) text = text.min(schema.minLength);

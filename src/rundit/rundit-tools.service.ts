@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { RunditSdkError, type RunditClient } from '@rundit-sdk/client';
-import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z, ZodError } from 'zod';
 import { SDK_VERSION, TOOLS, type ToolSpec } from '../generated/tools.js';
 import { schemaToZodShape, type JsonSchemaFragment } from './json-schema-to-zod.js';
@@ -12,6 +13,12 @@ type PreparedTool = {
 };
 
 const prepareSchema = (schema: JsonSchemaFragment) => z.object(schemaToZodShape(schema)).strict();
+
+class RunditMcpServer extends McpServer {
+  override connect(transport: Transport): Promise<void> {
+    return super.connect(withoutTasks(transport));
+  }
+}
 
 @Injectable()
 export class RunditToolsService {
@@ -34,7 +41,7 @@ export class RunditToolsService {
    * one per request, bound to that request's API key.
    */
   createServer(client: RunditClient): McpServer {
-    const server = new McpServer({
+    const server = new RunditMcpServer({
       name: 'rundit-mcp',
       version: '0.1.0',
     });
@@ -51,7 +58,6 @@ export class RunditToolsService {
     server.server.setRequestHandler(CallToolRequestSchema, ({ params }) => {
       const tool = this.tools.find(({ spec }) => spec.name === params.name);
       if (!tool) return Promise.resolve(errorResult('NOT_FOUND', `Unknown tool: ${params.name}`, 404));
-      if (params.task) return Promise.resolve(errorResult('INVALID_ARGUMENTS', 'Task execution is not supported', 422));
       return safeCall(() => tool.spec.invoke(client, tool.inputSchema.parse(params.arguments ?? {})));
     });
     return server;
@@ -73,8 +79,42 @@ const ERROR_CODES: Record<number, string> = {
   429: 'RATE_LIMITED',
 };
 
+function errorPayload(code: string, error: string, status: number, issues: FieldIssue[] = [], body: unknown = null) {
+  return { code, error, status, issues, body };
+}
+
+// Reject tasks before the SDK's task-capability and CreateTaskResult checks.
+// Both HTTP and stdio retain protocol errors with our structured envelope in error.data.
+function withoutTasks(transport: Transport): Transport {
+  return {
+    start: () => transport.start(),
+    send: (message, options) => transport.send(message, options),
+    close: () => transport.close(),
+    get sessionId() { return transport.sessionId; },
+    setProtocolVersion: (version) => transport.setProtocolVersion?.(version),
+    get onclose() { return transport.onclose; },
+    set onclose(handler) { transport.onclose = handler; },
+    get onerror() { return transport.onerror; },
+    set onerror(handler) { transport.onerror = handler; },
+    get onmessage() { return transport.onmessage; },
+    set onmessage(handler) {
+      transport.onmessage = handler ? (message, extra) => {
+        if ('id' in message && 'method' in message && message.method === 'tools/call' && message.params?.task) {
+          const error = 'Task execution is not supported';
+          void transport.send({ jsonrpc: '2.0', id: message.id, error: {
+            code: ErrorCode.InvalidParams, message: error,
+            data: errorPayload('INVALID_ARGUMENTS', error, 422),
+          } }, { relatedRequestId: message.id }).catch((error: Error) => transport.onerror?.(error));
+          return;
+        }
+        handler(message, extra);
+      } : undefined;
+    },
+  };
+}
+
 function errorResult(code: string, error: string, status: number, issues: FieldIssue[] = [], body: unknown = null): ToolResult {
-  return { content: [{ type: 'text', text: JSON.stringify({ code, error, status, issues, body }) }], isError: true };
+  return { content: [{ type: 'text', text: JSON.stringify(errorPayload(code, error, status, issues, body)) }], isError: true };
 }
 
 async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {

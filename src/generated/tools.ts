@@ -1755,21 +1755,21 @@ export const TOOLS: ToolSpec[] = [
         "linkedIn": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
         "github": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
         "website": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
@@ -1815,14 +1815,14 @@ export const TOOLS: ToolSpec[] = [
         "twitter": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
         "facebook": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
@@ -2235,21 +2235,21 @@ export const TOOLS: ToolSpec[] = [
         "linkedIn": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
         "github": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
         "website": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
@@ -2295,14 +2295,14 @@ export const TOOLS: ToolSpec[] = [
         "twitter": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
         "facebook": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https?://",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
           "maxLength": 2000
         },
