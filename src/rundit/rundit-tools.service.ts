@@ -123,10 +123,16 @@ async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
     return { content: [{ type: 'text', text: JSON.stringify(data ?? null) }] };
   } catch (err) {
     if (err instanceof ZodError) {
+      const seen = new Set<string>();
       const issues = err.issues.flatMap((issue): FieldIssue[] => issue.code === 'unrecognized_keys'
         ? issue.keys.map(key => ({ field: [...issue.path, key].join('.'), message: `Unknown field: ${key}` }))
         : [{ field: issue.path.join('.'), message: issue.message }])
-        .filter((issue, index, all) => all.findIndex(other => other.field === issue.field && other.message === issue.message) === index);
+        .filter((issue) => {
+          const key = JSON.stringify([issue.field, issue.message]);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
       const message = issues.map(issue => issue.message.toLowerCase().startsWith(`${issue.field.toLowerCase()} `)
         ? issue.message : `${issue.field || 'arguments'}: ${issue.message}`).join('; ');
       return errorResult('INVALID_ARGUMENTS', message, 422, issues);

@@ -181,6 +181,18 @@ describe('generated tools over HTTP', () => {
     expect(Object.keys(backendError).sort()).toEqual(Object.keys(localError).sort());
   });
 
+  it('reports large sets of unknown arguments without losing or reordering issues', async () => {
+    upstream.mockReset();
+    const fields = Array.from({ length: 20000 }, (_, index) => `unknown_${index}`);
+    const response = await request('tools/call', { name: 'profiles_list',
+      arguments: Object.fromEntries(fields.map((field) => [field, true])),
+    });
+    const error = JSON.parse(response.result.content[0].text);
+    expect(error.code).toBe('INVALID_ARGUMENTS');
+    expect(error.issues.map((issue: { field: string }) => issue.field)).toEqual(fields);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it('explains the HTTP/HTTPS requirement for invalid website values', async () => {
     upstream.mockReset();
     for (const website of ['javascript:alert(1)', 'not-a-url']) {
