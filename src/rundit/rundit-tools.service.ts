@@ -1,3 +1,4 @@
+import { STATUS_CODES } from 'node:http';
 import { Injectable } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { RunditSdkError, type RunditClient } from '@rundit-sdk/client';
@@ -117,6 +118,21 @@ function errorResult(code: string, error: string, status: number, issues: FieldI
   return { content: [{ type: 'text', text: JSON.stringify(errorPayload(code, error, status, issues, body)) }], isError: true };
 }
 
+function compactErrorBody(body: unknown, status: number, messages: string[], issues: FieldIssue[]): unknown {
+  const message = messages.join('; ');
+  if (body === message) return null;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const extra = Object.fromEntries(Object.entries(body).filter(([key, value]) => {
+    if ((key === 'message' || key === 'validationErrors') &&
+      (value === message || JSON.stringify(value) === JSON.stringify(messages))) return false;
+    if (key === 'errors' && JSON.stringify(value) === JSON.stringify(issues)) return false;
+    if (key === 'statusCode' && value === status) return false;
+    if (key === 'error' && (value === message || value === STATUS_CODES[status])) return false;
+    return true;
+  }));
+  return Object.keys(extra).length ? extra : null;
+}
+
 async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
   try {
     const data = await fn();
@@ -149,7 +165,8 @@ async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
         : err.status === 422 ? messages.map(message => ({
           field: message.match(/^property (\w+) should not exist/)?.[1] ?? message.match(/^([\w.]+)(?::| (?:must|should)\b)/)?.[1] ?? '', message,
         })) : [];
-      return errorResult(ERROR_CODES[err.status] ?? 'UPSTREAM_ERROR', messages.join('; '), err.status, issues, err.body);
+      return errorResult(ERROR_CODES[err.status] ?? 'UPSTREAM_ERROR', messages.join('; '), err.status, issues,
+        compactErrorBody(err.body, err.status, messages, issues));
     }
     return errorResult('INTERNAL_ERROR', err instanceof Error ? err.message : String(err), 500);
   }

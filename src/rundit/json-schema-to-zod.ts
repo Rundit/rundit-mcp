@@ -17,6 +17,8 @@ export interface JsonSchemaFragment {
   maxLength?: number;
   pattern?: string;
   format?: string;
+  title?: string;
+  'x-empty-as-null'?: boolean;
 }
 
 export type ZodRawShape = Record<string, ZodTypeAny>;
@@ -38,8 +40,7 @@ function schemaToZod(schema: JsonSchemaFragment, fieldName?: string): ZodTypeAny
   switch (schema.type) {
     case 'string':
       const isUrl = schema.format === 'uri' || schema.format === 'url';
-      const label = fieldName === 'linkedIn' ? 'LinkedIn' : fieldName === 'github' ? 'GitHub'
-        : fieldName ? fieldName[0].toUpperCase() + fieldName.slice(1) : 'Value';
+      const label = schema.title ?? (fieldName ? fieldName[0].toUpperCase() + fieldName.slice(1) : 'Value');
       const httpOnly = ['^https?://', '^[Hh][Tt][Tt][Pp][Ss]?://', '^[Hh][Tt][Tt][Pp][Ss]?:'].includes(schema.pattern ?? '');
       const urlMessage = `${label} must be a valid ${httpOnly ? 'HTTP or HTTPS ' : ''}URL.`;
       let text = z.string();
@@ -93,6 +94,11 @@ function schemaToZod(schema: JsonSchemaFragment, fieldName?: string): ZodTypeAny
       base = z.unknown();
   }
   if (schema.nullable) base = base.nullable();
+  if (schema.nullable && schema['x-empty-as-null']) {
+    // Keep blank clears visible when this validator is converted back to tool JSON Schema.
+    const clearable = z.union([base, z.string().regex(/^\s*$/).transform(() => null)]);
+    base = z.preprocess(value => typeof value === 'string' ? value.trim() || null : value, clearable);
+  }
   if (schema.description) base = base.describe(schema.description);
   return base;
 }

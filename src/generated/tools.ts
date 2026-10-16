@@ -1707,39 +1707,53 @@ export const TOOLS: ToolSpec[] = [
       "properties": {
         "surname": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Surname",
           "nullable": true,
           "maxLength": 100
         },
         "email": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Email",
           "format": "email",
           "nullable": true,
           "maxLength": 320
         },
         "telephone": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Telephone",
           "nullable": true,
           "maxLength": 100
         },
         "country": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Country",
           "nullable": true,
           "description": "Country of residence",
           "maxLength": 200
         },
         "avatarImageFileUuid": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Avatar",
           "format": "uuid",
           "nullable": true,
           "description": "Existing uploaded avatar file UUID; null clears the avatar. This endpoint does not upload files."
         },
         "expertiseAreas": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Area of expertise",
           "nullable": true,
           "maxLength": 10000
         },
         "educationLevel": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Education level",
           "nullable": true,
           "enum": [
             "school",
@@ -1754,6 +1768,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "linkedIn": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "LinkedIn",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -1761,6 +1777,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "github": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "GitHub",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -1768,6 +1786,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "website": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Website",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -1775,6 +1795,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "gender": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Gender",
           "nullable": true,
           "enum": [
             "male",
@@ -1785,12 +1807,16 @@ export const TOOLS: ToolSpec[] = [
         },
         "birthYear": {
           "type": "integer",
+          "x-empty-as-null": true,
+          "title": "Year of birth",
           "minimum": 1,
           "nullable": true,
           "description": "Year of birth; cannot be later than the current year"
         },
         "race": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Race",
           "nullable": true,
           "enum": [
             "white",
@@ -1804,16 +1830,22 @@ export const TOOLS: ToolSpec[] = [
         },
         "nationality": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Nationality",
           "nullable": true,
           "description": "Nationality value from profiles.getConfig"
         },
         "ethnicity": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Ethnicity",
           "nullable": true,
           "maxLength": 200
         },
         "twitter": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Twitter",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -1821,6 +1853,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "facebook": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Facebook",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -1842,6 +1876,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "position": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Position",
           "nullable": true,
           "enum": [
             "chief-executive",
@@ -1927,6 +1963,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "firstTimeFounder": {
           "type": "boolean",
+          "x-empty-as-null": true,
+          "title": "First time founder",
           "nullable": true,
           "description": "True = Yes, false = No, null = Not specified. Omit to preserve. A non-null value requires the founder role."
         },
@@ -1961,7 +1999,8 @@ export const TOOLS: ToolSpec[] = [
           "type": "string"
         },
         "companyId": {
-          "type": "number",
+          "minimum": 1,
+          "type": "integer",
           "description": "Company context for this directory entry. Must match an existing association; profiles cannot be moved to another company."
         }
       },
@@ -2012,7 +2051,8 @@ export const TOOLS: ToolSpec[] = [
           "type": "string"
         },
         "companyId": {
-          "type": "number",
+          "minimum": 1,
+          "type": "integer",
           "description": "Company context for this directory entry. Must match an existing association; profiles cannot be moved to another company."
         }
       },
@@ -2026,7 +2066,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: "profiles_list",
-    description: "List the founders, management and board directory\n\nReturns full profile fields for accessible companies, one entry per profile and company. Filter by company ids, funds, company name, person name, recorded roles, firstTimeFounder or position. Filters intersect. firstTimeFounder=false matches recorded No answers only, not unknown answers or non-founders. Omitted roles returns the whole directory. Absence of a role means not recorded, not a verified negative. First-time-founder null means Not specified. Ordered by company id then profile UUID; repeat the original filters when passing the next cursor. Existing legacy free-text values remain readable; format validation applies to supplied write fields.",
+    description: "List the founders, management and board directory\n\nReturns full profile fields for accessible companies, one entry per profile and company. Filter by company ids, funds, company name, person name, recorded roles, firstTimeFounder, position or positions (OR within the array). Filters intersect. firstTimeFounder=false matches recorded No answers only, not unknown answers or non-founders. Omitted roles returns the whole directory. Absence of a role means not recorded, not a verified negative. First-time-founder null means Not specified. Ordered by company id then profile UUID; repeat the original filters when passing the next cursor. Existing legacy free-text values remain readable; format validation applies to supplied write fields.",
     annotations: {"readOnlyHint":true,"destructiveHint":false},
     inputSchema: {
       "type": "object",
@@ -2129,6 +2169,93 @@ export const TOOLS: ToolSpec[] = [
           ],
           "description": "Filter by a company position from profiles.getConfig."
         },
+        "positions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "chief-executive",
+              "chief-operating",
+              "chief-financial",
+              "chief-information",
+              "chief-technology",
+              "chief-marketing",
+              "chief-human-resources",
+              "chief-design",
+              "chief-data",
+              "chief-product",
+              "chief-customer",
+              "chief-revenue",
+              "chief-sales",
+              "president",
+              "vice-president",
+              "vp-operations",
+              "vp-finance",
+              "vp-technology",
+              "vp-marketing",
+              "vp-sales",
+              "vp-human-resources",
+              "vp-product",
+              "vp-design",
+              "vp-customer-support",
+              "vp-business-development",
+              "head-operations",
+              "head-finance",
+              "head-technology",
+              "head-marketing",
+              "head-human-resources",
+              "head-product",
+              "head-design",
+              "head-customer-support",
+              "head-business-development",
+              "lead-operations",
+              "lead-finance",
+              "lead-technology",
+              "lead-marketing",
+              "lead-human-resources",
+              "lead-product",
+              "lead-design",
+              "lead-customer-support",
+              "lead-business-development",
+              "chief-mobility-officer",
+              "evp-business-and-legal-affairs",
+              "global-general-manager",
+              "evp-international-co-productions",
+              "chief-creative-officer",
+              "executive-chairman",
+              "chief-experience-n-strategy-officer",
+              "chief-corporate-officer",
+              "chief-of-staff",
+              "chief-people-officer",
+              "chief-privacy-officer",
+              "chief-legal-officer",
+              "svp-people-operations-n-experience",
+              "svp-marketing",
+              "svp-product-n-analytics",
+              "evp-strategic-partnerships",
+              "svp-of-sales",
+              "svp-strategic-initiatives",
+              "head-of-talent",
+              "head-of-partnerships",
+              "engineering-manager",
+              "director-of-customer-success",
+              "chief-compliance-officer",
+              "chief-strategy-officer",
+              "general-counsel",
+              "vp-engineering",
+              "director-of-engineering",
+              "chief-engineer",
+              "chief-medical-officer",
+              "executive-editor",
+              "managing-editor",
+              "vp-strategy-and-transformation",
+              "chief-business-officer",
+              "advisor",
+              "other"
+            ]
+          },
+          "description": "Match any of these positions (OR). Intersects with other filters, including scalar position when supplied."
+        },
         "companyIds": {
           "type": "array",
           "items": {
@@ -2187,39 +2314,53 @@ export const TOOLS: ToolSpec[] = [
         },
         "surname": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Surname",
           "nullable": true,
           "maxLength": 100
         },
         "email": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Email",
           "format": "email",
           "nullable": true,
           "maxLength": 320
         },
         "telephone": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Telephone",
           "nullable": true,
           "maxLength": 100
         },
         "country": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Country",
           "nullable": true,
           "description": "Country of residence",
           "maxLength": 200
         },
         "avatarImageFileUuid": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Avatar",
           "format": "uuid",
           "nullable": true,
           "description": "Existing uploaded avatar file UUID; null clears the avatar. This endpoint does not upload files."
         },
         "expertiseAreas": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Area of expertise",
           "nullable": true,
           "maxLength": 10000
         },
         "educationLevel": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Education level",
           "nullable": true,
           "enum": [
             "school",
@@ -2234,6 +2375,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "linkedIn": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "LinkedIn",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -2241,6 +2384,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "github": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "GitHub",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -2248,6 +2393,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "website": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Website",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -2255,6 +2402,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "gender": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Gender",
           "nullable": true,
           "enum": [
             "male",
@@ -2265,12 +2414,16 @@ export const TOOLS: ToolSpec[] = [
         },
         "birthYear": {
           "type": "integer",
+          "x-empty-as-null": true,
+          "title": "Year of birth",
           "minimum": 1,
           "nullable": true,
           "description": "Year of birth; cannot be later than the current year"
         },
         "race": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Race",
           "nullable": true,
           "enum": [
             "white",
@@ -2284,16 +2437,22 @@ export const TOOLS: ToolSpec[] = [
         },
         "nationality": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Nationality",
           "nullable": true,
           "description": "Nationality value from profiles.getConfig"
         },
         "ethnicity": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Ethnicity",
           "nullable": true,
           "maxLength": 200
         },
         "twitter": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Twitter",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -2301,6 +2460,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "facebook": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Facebook",
           "format": "uri",
           "pattern": "^[Hh][Tt][Tt][Pp][Ss]?:",
           "nullable": true,
@@ -2322,6 +2483,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "position": {
           "type": "string",
+          "x-empty-as-null": true,
+          "title": "Position",
           "nullable": true,
           "enum": [
             "chief-executive",
@@ -2407,6 +2570,8 @@ export const TOOLS: ToolSpec[] = [
         },
         "firstTimeFounder": {
           "type": "boolean",
+          "x-empty-as-null": true,
+          "title": "First time founder",
           "nullable": true,
           "description": "True = Yes, false = No, null = Not specified. Omit to preserve. A non-null value requires the founder role."
         },

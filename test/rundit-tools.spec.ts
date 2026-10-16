@@ -7,6 +7,7 @@ import { startHttpServer } from '../src/http-server.js';
 import type { RunditService } from '../src/rundit/rundit.service.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import { Validator } from '@cfworker/json-schema';
 
 const write = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('../src/generated/tools.js', async (importOriginal) => {
@@ -177,7 +178,7 @@ describe('generated tools over HTTP', () => {
     const backend = await request('tools/call', { name: 'profiles_create', arguments: { companyId: 17,
       name: 'Example', rolesInCompany: ['management'], birthYear: 3026 } });
     const backendError = JSON.parse(backend.result.content[0].text);
-    expect(backendError).toEqual({ code: 'INVALID_ARGUMENTS', error: body.message[0], status: 422, issues: body.errors, body });
+    expect(backendError).toEqual({ code: 'INVALID_ARGUMENTS', error: body.message[0], status: 422, issues: body.errors, body: null });
     expect(Object.keys(backendError).sort()).toEqual(Object.keys(localError).sort());
   });
 
@@ -191,6 +192,34 @@ describe('generated tools over HTTP', () => {
     expect(error.code).toBe('INVALID_ARGUMENTS');
     expect(error.issues.map((issue: { field: string }) => issue.field)).toEqual(fields);
     expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('normalizes profile blank clears before format validation while keeping required names required', async () => {
+    const listed = await request('tools/list');
+    const tool = listed.result.tools.find((tool: { name: string }) => tool.name === 'profiles_update');
+    expect(new Validator(tool.inputSchema).validate({ id: '1d972df2-5c8d-4e82-9b11-40bc08484321',
+      companyId: 17, email: '', website: ' ' }).valid).toBe(true);
+    upstream.mockReset().mockResolvedValueOnce(new Response('{}'));
+    const response = await request('tools/call', { name: 'profiles_update', arguments: {
+      id: '1d972df2-5c8d-4e82-9b11-40bc08484321', companyId: 17, email: '', website: ' ', surname: '', avatarImageFileUuid: '',
+    } });
+    expect(response.result.isError).not.toBe(true);
+    expect(JSON.parse(upstream.mock.calls[0][1]?.body as string)).toEqual({ companyId: 17,
+      email: null, website: null, surname: null, avatarImageFileUuid: null });
+    upstream.mockReset();
+    const invalid = await request('tools/call', { name: 'profiles_create', arguments: { companyId: 17, name: '', rolesInCompany: ['management'] } });
+    expect(invalid.result.isError).toBe(true);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('compacts repeated upstream error content without discarding domain codes or extra metadata', async () => {
+    const body = { statusCode: 422, error: 'Unprocessable Entity', message: ['Choose a role'],
+      errors: [{ field: 'rolesInCompany', message: 'Choose a role' }], code: 'INVALID_PROFILE_ROLES',
+      details: { permitted: ['management'] }, requestId: 'trace-123' };
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 422, headers: { 'Content-Type': 'application/json' } }));
+    const response = await request('tools/call', { name: 'profiles_create', arguments: { companyId: 17, name: 'Example' } });
+    expect(JSON.parse(response.result.content[0].text)).toEqual({ code: 'INVALID_ARGUMENTS', error: 'Choose a role',
+      status: 422, issues: body.errors, body: { code: body.code, details: body.details, requestId: body.requestId } });
   });
 
   it('explains the HTTP/HTTPS requirement for invalid website values', async () => {
