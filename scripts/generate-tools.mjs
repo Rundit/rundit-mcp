@@ -2,7 +2,7 @@
 // Reads the openapi.json shipped with @rundit-sdk/client and emits
 // src/generated/tools.ts — one MCP ToolSpec per SDK operation.
 //
-// Pass --check to verify the committed file matches the current SDK
+// Pass --check to verify the local build artifact matches the current SDK
 // without writing; non-zero exit signals drift.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -167,7 +167,7 @@ if (checkMode) {
   if (current !== content) {
     process.stderr.write(
       `[codegen:check] ${outPath} is out of date for @rundit-sdk/client v${sdkPkg.version}.\n` +
-        `Run 'npm run codegen' and commit the result.\n`,
+        `Run 'npm run codegen' to refresh the build artifact.\n`,
     );
     process.exit(1);
   }
