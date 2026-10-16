@@ -222,6 +222,30 @@ describe('generated tools over HTTP', () => {
       status: 422, issues: body.errors, body: { code: body.code, details: body.details, requestId: body.requestId } });
   });
 
+  it.each([
+    [{ message: 'Company is not editable', validationErrors: [] }, 'Company is not editable'],
+    [{ message: [], error: 'Forbidden' }, 'Forbidden'],
+    [{ message: [null, 7, '  '], error: 'Not allowed' }, 'Not allowed'],
+    [{ message: [], validationErrors: ['Name is required'], error: 'Forbidden' }, 'Name is required'],
+    [{ message: ['', null, 'Known failure'], validationErrors: [] }, 'Known failure'],
+  ])('preserves fallback explanations when message arrays contain no useful strings', async (body, expected) => {
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify(body), {
+      status: 403, headers: { 'Content-Type': 'application/json' },
+    }));
+    const response = await request('tools/call', { name: 'profiles_list', arguments: {} });
+    expect(response.result.isError).toBe(true);
+    expect(JSON.parse(response.result.content[0].text)).toMatchObject({ code: 'FORBIDDEN', status: 403, error: expected });
+  });
+
+  it('retains an SDK or HTTP explanation when upstream fields are empty or non-string', async () => {
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify({ message: [], validationErrors: [null], error: ' ' }), {
+      status: 403, headers: { 'Content-Type': 'application/json' },
+    }));
+    const response = await request('tools/call', { name: 'profiles_list', arguments: {} });
+    const error = JSON.parse(response.result.content[0].text);
+    expect(error.error.trim().length).toBeGreaterThan(0);
+  });
+
   it('explains the HTTP/HTTPS requirement for invalid website values', async () => {
     upstream.mockReset();
     for (const website of ['javascript:alert(1)', 'not-a-url']) {

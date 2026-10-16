@@ -123,6 +123,7 @@ function compactErrorBody(body: unknown, status: number, messages: string[], iss
   if (body === message) return null;
   if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
   const extra = Object.fromEntries(Object.entries(body).filter(([key, value]) => {
+    if ((key === 'message' || key === 'validationErrors') && Array.isArray(value) && !value.length) return false;
     if ((key === 'message' || key === 'validationErrors') &&
       (value === message || JSON.stringify(value) === JSON.stringify(messages))) return false;
     if (key === 'errors' && JSON.stringify(value) === JSON.stringify(issues)) return false;
@@ -155,10 +156,12 @@ async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
     }
     if (err instanceof RunditSdkError) {
       const body = err.body && typeof err.body === 'object' ? err.body as Record<string, unknown> : {};
-      const rawMessages = Array.isArray(body.message) ? body.message : body.validationErrors;
-      const messages = Array.isArray(rawMessages) ? rawMessages.filter((message): message is string => typeof message === 'string')
-        : typeof body.message === 'string' ? [body.message] : typeof body.error === 'string' ? [body.error]
-          : typeof err.body === 'string' ? [err.body] : [err.message];
+      const isMessage = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+      const arrayMessages = [body.message, body.validationErrors].filter(Array.isArray)
+        .map(messages => messages.filter(isMessage)).find(messages => messages.length > 0);
+      const fallback = [body.message, body.error, err.body, err.message].find(isMessage)
+        ?? STATUS_CODES[err.status] ?? 'Upstream request failed';
+      const messages = arrayMessages ?? [fallback];
       const issues: FieldIssue[] = Array.isArray(body.errors)
         ? body.errors.filter((issue): issue is FieldIssue => !!issue && typeof issue === 'object' &&
           typeof issue.field === 'string' && typeof issue.message === 'string')
