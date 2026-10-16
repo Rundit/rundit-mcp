@@ -18,11 +18,9 @@ jobs:
 
       - run: npm ci
 
-      # The committed tools.ts must match what the installed SDK generates.
-      - run: npm run codegen:check
+      # Generate the untracked catalogue from the installed SDK before compilation/tests.
+      - run: npm run build
 
       - run: npm run lint
-
-      - run: npm run build
 
       - run: npm test

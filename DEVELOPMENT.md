@@ -165,8 +165,8 @@ stack's redeployment hook URL from its Cloud 66 stack page.
 
 Consequences of tracking dist-tags:
 - The `@rundit-sdk/client` pin in `package.json`/`package-lock.json` and the
-  committed `tools.ts` describe local development, not what production runs —
-  bump them periodically so review diffs stay meaningful.
+  generated local `tools.ts` describe local development, not what production runs —
+  update the SDK pin periodically to keep local builds and tests current.
 - Any Cloud 66 rebuild (e.g. a config redeploy) picks up whatever the tag
   points at at that moment — `rc` on test, `latest` on production.
 - The deploy gate for a new SDK is the image build itself (codegen + `tsc`);
@@ -190,18 +190,19 @@ npm start
 | `npm run codegen:check` | Exits non-zero if `tools.ts` is stale |
 | `npm run build` | Runs codegen + `tsc` |
 
-The generated file is committed so SDK upgrades show as a reviewable diff.
+`src/generated/` is an ignored build artifact. Builds, startup and tests generate
+the catalogue from the installed SDK; Docker startup already runs the same build.
+Commit generator/runtime changes and SDK dependency updates rather than generated output.
 
 ## CI
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes to `main`
-and on every PR: `npm ci` → `codegen:check` (committed `tools.ts` matches the
-installed SDK) → `lint` ([oxlint](https://oxc.rs/docs/guide/usage/linter)) →
-`build` (codegen + `tsc`) → `test` ([vitest](https://vitest.dev), specs in
+and on every PR: `npm ci` → `build` (codegen + `tsc` from the installed SDK) →
+`lint` ([oxlint](https://oxc.rs/docs/guide/usage/linter)) → `test` ([vitest](https://vitest.dev), specs in
 `test/`). Run the same locally:
 
 ```bash
-npm run codegen:check && npm run lint && npm run build && npm test
+npm run build && npm run lint && npm test
 ```
 
 ## Smoke test

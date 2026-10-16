@@ -5,6 +5,9 @@ import type { Server } from 'node:http';
 import { RunditToolsService } from '../src/rundit/rundit-tools.service.js';
 import { startHttpServer } from '../src/http-server.js';
 import type { RunditService } from '../src/rundit/rundit.service.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import { Validator } from '@cfworker/json-schema';
 
 const write = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('../src/generated/tools.js', async (importOriginal) => {
@@ -47,6 +50,43 @@ async function request(method: string, params?: unknown) {
 }
 
 describe('generated tools over HTTP', () => {
+  it('applies task rejection to non-HTTP transports too', async () => {
+    const [serverTransport, peer] = InMemoryTransport.createLinkedPair();
+    const mcp = new RunditToolsService().createServer(client);
+    try {
+      const response = new Promise<JSONRPCMessage>((resolve) => { peer.onmessage = resolve; });
+      await mcp.connect(serverTransport);
+      await peer.start();
+      await peer.send({ jsonrpc: '2.0', id: 42, method: 'tools/call', params: {
+        name: 'profiles_list', arguments: {}, task: { ttl: 60000 },
+      } });
+      expect(await response).toMatchObject({ id: 42, error: { code: -32602,
+        data: { code: 'INVALID_ARGUMENTS', status: 422, error: 'Task execution is not supported' } } });
+    } finally {
+      await mcp.close();
+      await peer.close();
+    }
+  });
+
+  it.each(['profiles_list', 'unknown_tool'])('rejects task-augmented calls for %s with structured protocol error data', async (name) => {
+    upstream.mockReset();
+    const response = await request('tools/call', { name, arguments: {}, task: { ttl: 60000 } });
+    expect(response.error).toMatchObject({ code: -32602,
+      data: { code: 'INVALID_ARGUMENTS', error: 'Task execution is not supported', status: 422, issues: [], body: null } });
+    expect(response.error.message).not.toContain('Invalid task creation result');
+    expect(response.result).toBeUndefined();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('accepts uppercase HTTP schemes from the generated profile schema', async () => {
+    upstream.mockReset().mockResolvedValueOnce(new Response('{}'));
+    const response = await request('tools/call', { name: 'profiles_create', arguments: {
+      companyId: 17, name: 'Example', rolesInCompany: ['management'], website: 'HTTPS://example.com',
+    } });
+    expect(response.result.isError).not.toBe(true);
+    expect(upstream).toHaveBeenCalledOnce();
+  });
+
   it('publishes safety hints for reads, POST-based reads and writes', async () => {
     const response = await request('tools/list');
     for (const name of ['companies_get_all', 'metrics_search', 'metrics_compare', 'metrics_aggregate']) {
@@ -56,6 +96,12 @@ describe('generated tools over HTTP', () => {
     }
     expect(response.result.tools).toContainEqual(expect.objectContaining({
       name: 'fixture_write', annotations: expect.objectContaining({ readOnlyHint: false, destructiveHint: true }),
+    }));
+    expect(response.result.tools).toContainEqual(expect.objectContaining({
+      name: 'profiles_create', annotations: expect.objectContaining({ readOnlyHint: false, destructiveHint: false }),
+    }));
+    expect(response.result.tools).toContainEqual(expect.objectContaining({
+      name: 'profiles_delete', annotations: expect.objectContaining({ readOnlyHint: false, destructiveHint: true }),
     }));
   });
 
@@ -77,5 +123,141 @@ describe('generated tools over HTTP', () => {
     const response = await request('tools/call', { name: 'fixture_write', arguments: { points } });
     expect(response.result).toEqual({ content: [{ type: 'text', text: 'null' }] });
     expect(write).toHaveBeenCalledExactlyOnceWith({ points });
+  });
+
+  it('forwards profile PATCH values, including false and explicit null clears', async () => {
+    const id = '1d972df2-5c8d-4e82-9b11-40bc08484321';
+    for (const firstTimeFounder of [false, null]) {
+      upstream.mockReset().mockResolvedValueOnce(new Response('{}'));
+      const args = { id, companyId: 17, firstTimeFounder, position: null, country: null };
+      const response = await request('tools/call', { name: 'profiles_update', arguments: args });
+      expect(response.result.isError).not.toBe(true);
+      const [url, init] = upstream.mock.calls[0];
+      expect(url).toBe(`http://example.test/api/v2/sdk/profiles/${id}`);
+      expect(init?.method).toBe('PATCH');
+      expect(JSON.parse(init?.body as string)).toEqual({ companyId: 17, firstTimeFounder, position: null, country: null });
+    }
+  });
+
+  it('deletes profiles with a company context and handles 204 responses', async () => {
+    const id = '1d972df2-5c8d-4e82-9b11-40bc08484321';
+    upstream.mockReset().mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const response = await request('tools/call', { name: 'profiles_delete', arguments: { id, companyId: 17 } });
+    expect(response.result.isError).not.toBe(true);
+    const [url, init] = upstream.mock.calls[0];
+    expect(url).toBe(`http://example.test/api/v2/sdk/profiles/${id}?companyId=17`);
+    expect(init?.method).toBe('DELETE');
+    expect(init?.body).toBeUndefined();
+  });
+
+  it.each([
+    ['profiles_update', { id: '1d972df2-5c8d-4e82-9b11-40bc08484321', companyId: 17, surName: 'Typo' }, 'surName'],
+    ['profiles_list', { plausibleButUnsupportedFilter: true }, 'plausibleButUnsupportedFilter'],
+    ['fixture_write', { points: [{ value: 0, optionValue: null, typo: true }] }, 'points.0.typo'],
+  ])('rejects unknown fields in %s without invoking the upstream API', async (name, args, field) => {
+    upstream.mockReset();
+    write.mockClear();
+    const response = await request('tools/call', { name, arguments: args });
+    expect(response.result.isError).toBe(true);
+    const error = JSON.parse(response.result.content[0].text);
+    expect(error).toMatchObject({ code: 'INVALID_ARGUMENTS', status: 422, body: null,
+      issues: expect.arrayContaining([expect.objectContaining({ field })]) });
+    expect(upstream).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('uses the same structured envelope for local validation and backend field errors', async () => {
+    const local = await request('tools/call', { name: 'profiles_list', arguments: { firstTimeFounder: 'true' } });
+    expect(local.result.isError).toBe(true);
+    const localError = JSON.parse(local.result.content[0].text);
+    expect(localError).toMatchObject({ code: 'INVALID_ARGUMENTS', status: 422,
+      issues: [expect.objectContaining({ field: 'firstTimeFounder' })] });
+    const body = { message: ['birthYear must not be later than the current year'],
+      errors: [{ field: 'birthYear', message: 'birthYear must not be later than the current year' }] };
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 422, headers: { 'Content-Type': 'application/json' } }));
+    const backend = await request('tools/call', { name: 'profiles_create', arguments: { companyId: 17,
+      name: 'Example', rolesInCompany: ['management'], birthYear: 3026 } });
+    const backendError = JSON.parse(backend.result.content[0].text);
+    expect(backendError).toEqual({ code: 'INVALID_ARGUMENTS', error: body.message[0], status: 422, issues: body.errors, body: null });
+    expect(Object.keys(backendError).sort()).toEqual(Object.keys(localError).sort());
+  });
+
+  it('reports large sets of unknown arguments without losing or reordering issues', async () => {
+    upstream.mockReset();
+    const fields = Array.from({ length: 20000 }, (_, index) => `unknown_${index}`);
+    const response = await request('tools/call', { name: 'profiles_list',
+      arguments: Object.fromEntries(fields.map((field) => [field, true])),
+    });
+    const error = JSON.parse(response.result.content[0].text);
+    expect(error.code).toBe('INVALID_ARGUMENTS');
+    expect(error.issues.map((issue: { field: string }) => issue.field)).toEqual(fields);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('normalizes profile blank clears before format validation while keeping required names required', async () => {
+    const listed = await request('tools/list');
+    const tool = listed.result.tools.find((tool: { name: string }) => tool.name === 'profiles_update');
+    expect(new Validator(tool.inputSchema).validate({ id: '1d972df2-5c8d-4e82-9b11-40bc08484321',
+      companyId: 17, email: '', website: ' ' }).valid).toBe(true);
+    upstream.mockReset().mockResolvedValueOnce(new Response('{}'));
+    const response = await request('tools/call', { name: 'profiles_update', arguments: {
+      id: '1d972df2-5c8d-4e82-9b11-40bc08484321', companyId: 17, email: '', website: ' ', surname: '', avatarImageFileUuid: '',
+    } });
+    expect(response.result.isError).not.toBe(true);
+    expect(JSON.parse(upstream.mock.calls[0][1]?.body as string)).toEqual({ companyId: 17,
+      email: null, website: null, surname: null, avatarImageFileUuid: null });
+    upstream.mockReset();
+    const invalid = await request('tools/call', { name: 'profiles_create', arguments: { companyId: 17, name: '', rolesInCompany: ['management'] } });
+    expect(invalid.result.isError).toBe(true);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('compacts repeated upstream error content without discarding domain codes or extra metadata', async () => {
+    const body = { statusCode: 422, error: 'Unprocessable Entity', message: ['Choose a role'],
+      errors: [{ field: 'rolesInCompany', message: 'Choose a role' }], code: 'INVALID_PROFILE_ROLES',
+      details: { permitted: ['management'] }, requestId: 'trace-123' };
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 422, headers: { 'Content-Type': 'application/json' } }));
+    const response = await request('tools/call', { name: 'profiles_create', arguments: { companyId: 17, name: 'Example' } });
+    expect(JSON.parse(response.result.content[0].text)).toEqual({ code: 'INVALID_ARGUMENTS', error: 'Choose a role',
+      status: 422, issues: body.errors, body: { code: body.code, details: body.details, requestId: body.requestId } });
+  });
+
+  it.each([
+    [{ message: 'Company is not editable', validationErrors: [] }, 'Company is not editable'],
+    [{ message: [], error: 'Forbidden' }, 'Forbidden'],
+    [{ message: [null, 7, '  '], error: 'Not allowed' }, 'Not allowed'],
+    [{ message: [], validationErrors: ['Name is required'], error: 'Forbidden' }, 'Name is required'],
+    [{ message: ['', null, 'Known failure'], validationErrors: [] }, 'Known failure'],
+  ])('preserves fallback explanations when message arrays contain no useful strings', async (body, expected) => {
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify(body), {
+      status: 403, headers: { 'Content-Type': 'application/json' },
+    }));
+    const response = await request('tools/call', { name: 'profiles_list', arguments: {} });
+    expect(response.result.isError).toBe(true);
+    expect(JSON.parse(response.result.content[0].text)).toMatchObject({ code: 'FORBIDDEN', status: 403, error: expected });
+  });
+
+  it('retains an SDK or HTTP explanation when upstream fields are empty or non-string', async () => {
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify({ message: [], validationErrors: [null], error: ' ' }), {
+      status: 403, headers: { 'Content-Type': 'application/json' },
+    }));
+    const response = await request('tools/call', { name: 'profiles_list', arguments: {} });
+    const error = JSON.parse(response.result.content[0].text);
+    expect(error.error.trim().length).toBeGreaterThan(0);
+  });
+
+  it('explains the HTTP/HTTPS requirement for invalid website values', async () => {
+    upstream.mockReset();
+    for (const website of ['javascript:alert(1)', 'not-a-url']) {
+      const response = await request('tools/call', { name: 'profiles_create', arguments: {
+        companyId: 17, name: 'Example', rolesInCompany: ['management'], website,
+      } });
+      expect(response.result.isError).toBe(true);
+      const message = 'Website must be a valid HTTP or HTTPS URL.';
+      expect(JSON.parse(response.result.content[0].text)).toMatchObject({
+        error: message, issues: [{ field: 'website', message }],
+      });
+    }
+    expect(upstream).not.toHaveBeenCalled();
   });
 });

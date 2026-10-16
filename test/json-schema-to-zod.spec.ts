@@ -2,6 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { schemaToZodShape } from '../src/rundit/json-schema-to-zod.js';
 
 describe('schemaToZodShape', () => {
+  it('uses schema titles for labels without domain-specific field-name rules', () => {
+    const shape = schemaToZodShape({ type: 'object', properties: {
+      arbitraryField: { type: 'string', format: 'uri', title: 'Documentation link' },
+    } });
+    const result = shape.arbitraryField.safeParse('not-a-url');
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0].message).toBe('Documentation link must be a valid URL.');
+  });
+
+  it('applies empty-to-null normalization only when explicitly requested by schema metadata', () => {
+    const shape = schemaToZodShape({ type: 'object', properties: {
+      clearable: { type: 'string', format: 'email', nullable: true, 'x-empty-as-null': true },
+      ordinary: { type: 'string', nullable: true },
+      required: { type: 'string', minLength: 1 },
+    }, required: ['required'] });
+    expect(shape.clearable.parse(' ')).toBeNull();
+    expect(shape.clearable.parse(' person@example.com ')).toBe('person@example.com');
+    expect(shape.clearable.parse(undefined)).toBeUndefined();
+    expect(shape.ordinary.parse('')).toBe('');
+    expect(shape.required.safeParse('').success).toBe(false);
+  });
   it('enforces inclusive numeric bounds and integer values', () => {
     const shape = schemaToZodShape({ type: 'object', properties: {
       count: { type: 'integer', minimum: 0, maximum: 2 },
