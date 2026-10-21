@@ -1,0 +1,146 @@
+name: Update SDK and Deploy MCP
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: SDK release channel (rc targets main; latest targets production)
+        required: true
+        type: choice
+        options: [rc, latest]
+      version:
+        description: Exact published SDK version, e.g. 0.3.7-rc.24 or 0.3.7
+        required: true
+        type: string
+
+# Serialize updates and hook requests per deployment branch. Do not interrupt a
+# run between pushing its dependency update and requesting the deployment.
+concurrency:
+  group: mcp-sdk-${{ inputs.channel }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SDK_CHANNEL: ${{ inputs.channel }}
+  SDK_VERSION: ${{ inputs.version }}
+
+jobs:
+  validate:
+    # Dispatch this workflow on main for both channels. The target checkout below
+    # is chosen by validated channel, never by an arbitrary caller-supplied ref.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.target.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Validate release and resolve target branch
+        id: target
+        run: node scripts/sdk-release.mjs
+
+  update-and-deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Mint token for rundit-mcp
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.SDK_BOT_APP_ID }}
+          private-key: ${{ secrets.SDK_BOT_PRIVATE_KEY }}
+          owner: Rundit
+          repositories: rundit-mcp
+          permission-contents: write
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.branch }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Skip stale releases
+        id: release
+        run: node scripts/sdk-release.mjs
+        env:
+          CHECK_CURRENT: 'true'
+
+      - name: Wait for the exact SDK version on npm
+        if: steps.release.outputs.deploy == 'true'
+        shell: bash
+        run: |
+          for attempt in {1..12}; do
+            if published="$(npm view "@rundit-sdk/client@$SDK_VERSION" version --fetch-retries=0 --fetch-timeout=10000 2>/dev/null)" && [[ "$published" == "$SDK_VERSION" ]]; then
+              exit 0
+            fi
+            echo "Waiting for @rundit-sdk/client@$SDK_VERSION ($attempt/12)."
+            sleep 10
+          done
+          echo '::error::SDK version is not available on npm.'
+          exit 1
+
+      - name: Pin SDK and install from lockfile
+        if: steps.release.outputs.deploy == 'true'
+        run: |
+          npm install --package-lock-only --ignore-scripts --save-exact --no-audit --no-fund "@rundit-sdk/client@$SDK_VERSION"
+          npm ci --include=dev --no-audit --no-fund
+
+      - name: Validate MCP against the new SDK
+        if: steps.release.outputs.deploy == 'true'
+        run: |
+          npm run build
+          npm run lint
+          npm test
+
+      - name: Commit validated dependency update
+        if: steps.release.outputs.deploy == 'true'
+        env:
+          BOT_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          TARGET_BRANCH: ${{ needs.validate.outputs.branch }}
+        run: |
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo 'SDK already pinned; retrying deployment without another commit.'
+            exit 0
+          fi
+          git config user.name "$BOT_SLUG[bot]"
+          git config user.email "$BOT_SLUG[bot]@users.noreply.github.com"
+          git commit -m "chore: update SDK client to $SDK_VERSION"
+          # No force push: if another change landed during validation, fail and
+          # rerun so that the new branch head is tested before it is deployed.
+          git push origin "HEAD:$TARGET_BRANCH"
+
+      - name: Rebuild hosted MCP
+        if: steps.release.outputs.deploy == 'true'
+        env:
+          MCP_REDEPLOY_HOOK: ${{ secrets[inputs.channel == 'latest' && 'CLOUD66_MCP_REDEPLOY_HOOK_PROD' || 'CLOUD66_MCP_REDEPLOY_HOOK_TEST'] }}
+          TARGET_BRANCH: ${{ needs.validate.outputs.branch }}
+        shell: bash
+        run: |
+          remote_head="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)"
+          if [[ "$remote_head" != "$(git rev-parse HEAD)" ]]; then
+            echo '::error::Deployment branch changed after validation; rerun this workflow.'
+            exit 1
+          fi
+          if [[ "$MCP_REDEPLOY_HOOK" != https://hooks.cloud66.com/* || "$MCP_REDEPLOY_HOOK" =~ [[:space:]] ]]; then
+            echo '::error::Configure a Cloud 66 HTTPS hook URL without whitespace.'
+            exit 1
+          fi
+          status=0
+          http_code="$(curl --silent --fail --output /dev/null --write-out '%{http_code}' --max-time 30 --request POST "$MCP_REDEPLOY_HOOK")" || status=$?
+          echo "Cloud 66 hook: HTTP $http_code; curl exit code $status."
+          if (( status != 0 )) || [[ "$http_code" != 2?? ]]; then
+            echo '::error::MCP rebuild request failed. Retry this workflow with the same version.'
+            exit 1
+          fi
+          echo 'Cloud 66 accepted the request; verify the build and rollout in Cloud 66.'

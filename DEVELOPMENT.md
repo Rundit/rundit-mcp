@@ -2,7 +2,7 @@
 
 ## Architecture
 
-`rundit-mcp` is a NestJS process that registers every `@rundit-sdk/client` method as an MCP tool. It speaks two transports, selected by `MCP_TRANSPORT`: **stdio** (default — one process per user, key from `RUNDIT_API_KEY`) and **http** (stateless Streamable HTTP for the hosted deployment — a fresh MCP server per `POST /mcp`, bound to the API key from that request's headers; see `src/http-server.ts`). The tool list is **generated from the SDK's `openapi.json`** — at container start in production, and via `npm run build` locally.
+`rundit-mcp` is a NestJS process that registers every `@rundit-sdk/client` method as an MCP tool. It speaks two transports, selected by `MCP_TRANSPORT`: **stdio** (default — one process per user, key from `RUNDIT_API_KEY`) and **http** (stateless Streamable HTTP for the hosted deployment — a fresh MCP server per `POST /mcp`, bound to the API key from that request's headers; see `src/http-server.ts`). The tool list is **generated from the SDK's `openapi.json`** — at image-build time for hosted deployments, at container start for the stdio Docker image, and via `npm run build` locally.
 
 ```
 @rundit-sdk/client (openapi.json)
@@ -14,7 +14,7 @@ src/generated/tools.ts
 dist/main.js  ──stdin/stdout──>  MCP client (Claude Code)
 ```
 
-**In Docker**, the entrypoint runs `npm install @rundit-sdk/client@$RUNDIT_SDK_DIST_TAG` (defaults to `latest`), then `npm run build` (codegen + `tsc`), then `node dist/main.js`. This means each MCP session boot pulls the freshest SDK from npm without an image rebuild. Stale SDK ↔ src drift now surfaces at startup as a `tsc` error instead of silently in a stale image. See [`scripts/docker-entrypoint.sh`](scripts/docker-entrypoint.sh).
+**In the stdio Docker image**, the entrypoint runs `npm install @rundit-sdk/client@$RUNDIT_SDK_DIST_TAG` (defaults to `latest`), then `npm run build` (codegen + `tsc`), then `node dist/main.js`. This means each MCP session boot pulls the freshest SDK from npm without an image rebuild. Stale SDK ↔ src drift now surfaces at startup as a `tsc` error instead of silently in a stale image. See [`scripts/docker-entrypoint.sh`](scripts/docker-entrypoint.sh).
 
 **Locally**, `build-local.sh` links the client generated in the sibling `rundit-sdk` checkout, regenerates `tools.ts`, and compiles — see the iteration workflow below.
 
@@ -130,47 +130,78 @@ Two consequences:
 
 ### Hosted deployment sync (Cloud 66)
 
-The hosted image bakes the SDK at image-build time from an npm dist-tag. There
-is one Dockerfile per stack, identical except for the tag:
+The hosted images install the exact SDK version committed in `package.json`
+and `package-lock.json` using `npm ci`. Code generation and compilation run
+against that version before development dependencies are removed.
 
-| Stack | Dockerfile | Installs |
-|-------|------------|----------|
-| production | [`Dockerfile.hosted`](Dockerfile.hosted) | `@rundit-sdk/client@latest` |
-| test | [`Dockerfile.hosted.test`](Dockerfile.hosted.test) | `@rundit-sdk/client@rc` |
+| Stack | Dockerfile | SDK version |
+|-------|------------|-------------|
+| production | [`Dockerfile.hosted`](Dockerfile.hosted) | Pinned in the production deployment branch's manifests |
+| test | [`Dockerfile.hosted.test`](Dockerfile.hosted.test) | Pinned in the test deployment branch's manifests |
 
-Each Cloud 66 stack selects its file via `dockerfile_path` in its service.yml
-(`mcp` service). No build args, Habitus secrets, or stack env vars are
-involved — the tag is literally in the file. The build log prints
-`==> Baked @rundit-sdk/client@<version>`; check that line first when the
-running server reports an unexpected tool count. Layer caching cannot pin a
-stale version: each Dockerfile `ADD`s the npm registry manifest for its
-dist-tag (`registry.npmjs.org/@rundit-sdk/client/<tag>`) before the install,
-and Docker re-fetches ADD URLs on every build and keys the cache on their
-content, so a moved tag rebuilds the install layer automatically. The build
-log also prints `==> Target @rundit-sdk/client@<tag> = <version>` from that
-manifest; if Target and Baked disagree, the build reached the registry but
-`npm install` did not resolve the same tag.
+Each Cloud 66 stack selects its file via `dockerfile_path` in its `mcp`
+service configuration. The files retain separate names for the existing stack
+configuration, but use the same installation steps. Neither file resolves the
+moving `rc` or `latest` npm tag. The build log prints
+`==> Baked @rundit-sdk/client@<version>`.
 
-Deployments follow SDK releases automatically: after every publish,
-`rundit-sdk`'s publish workflow waits for npm to serve the new version on the
-channel's dist-tag, then calls the matching stack's Cloud 66 redeployment
-hook — `rc` publish → test stack, `latest` publish → prod stack. The rebuild
-installs the fresh tag; no commit in this repo is involved. A failed or
-skipped redeploy is recovered by re-running the publish workflow run, or by
-hitting the stack's redeploy hook manually.
+To prepare an SDK update, install the exact published version and validate it:
 
-Required configuration (in the **rundit-sdk** repo's secrets):
-`CLOUD66_MCP_REDEPLOY_HOOK_TEST` and `CLOUD66_MCP_REDEPLOY_HOOK_PROD` — each
-stack's redeployment hook URL from its Cloud 66 stack page.
+```bash
+npm install --save-exact @rundit-sdk/client@<version>
+npm run build && npm run lint && npm test
+```
 
-Consequences of tracking dist-tags:
-- The `@rundit-sdk/client` pin in `package.json`/`package-lock.json` and the
-  generated local `tools.ts` describe local development, not what production runs —
-  update the SDK pin periodically to keep local builds and tests current.
-- Any Cloud 66 rebuild (e.g. a config redeploy) picks up whatever the tag
-  points at at that moment — `rc` on test, `latest` on production.
-- The deploy gate for a new SDK is the image build itself (codegen + `tsc`);
-  the vitest suite only runs in this repo's CI against the pinned version.
+Commit both manifests to the deployment branch before triggering its Cloud 66
+hook. Cloud 66 can reuse an existing image when the Git revision has not
+changed; calling the hook alone does not update the SDK. Changes to the
+manifests also invalidate Docker's dependency-install layer when a build runs.
+
+Rollout prerequisite: separate the test and production deployment branches and
+pin an appropriate SDK version in each before deploying this Dockerfile change.
+The SDK publisher dispatches the update workflow below instead of calling
+Cloud 66 directly. Deploy and configure this receiver before enabling that
+sender; until then, the workflow can be run manually.
+
+#### Update SDK and Deploy MCP workflow
+
+Run [`.github/workflows/update-sdk.yml`](.github/workflows/update-sdk.yml) on
+`main`, with an exact published `version` and `channel`:
+
+| Channel | Version format | Target branch | Hook secret |
+|---------|----------------|---------------|-------------|
+| `rc` | `X.Y.Z-rc.N` | `main` | `CLOUD66_MCP_REDEPLOY_HOOK_TEST` |
+| `latest` | `X.Y.Z` | `production` | `CLOUD66_MCP_REDEPLOY_HOOK_PROD` |
+
+The workflow waits for the exact npm version, updates both dependency manifests,
+installs from the lockfile, and runs build, lint, and tests. Only then does it
+commit and push the manifests and call the matching Cloud 66 hook. Older
+versions are skipped to prevent delayed releases from rolling back a newer pin.
+Updates are serialized per channel; GitHub concurrency can replace pending runs,
+so this is deployment of the newest requested release, not an exhaustive queue.
+
+To recover a failed hook, dispatch again with the same version and channel.
+An already-pinned version still runs validation and requests deployment without
+creating another commit. A failed push or a changed branch head prevents the
+hook from running; rerun against the updated head. Hook success confirms only
+that Cloud 66 accepted the request. Check the image's `Baked` log and rollout
+status in Cloud 66.
+
+Required secrets in **rundit-mcp**:
+
+- `SDK_BOT_APP_ID` and `SDK_BOT_PRIVATE_KEY`: the GitHub App must be installed
+  for this repository with Contents write access and permission to push to the
+  deployment branches under their branch protection rules.
+- `CLOUD66_MCP_REDEPLOY_HOOK_TEST` and `CLOUD66_MCP_REDEPLOY_HOOK_PROD`:
+  each stack's hook selecting the `mcp` deployment profile. Store single-line
+  HTTPS URLs with any spaces in profile names URL-encoded.
+
+Before enabling this workflow, `production` must exist with these scripts and
+Dockerfile changes, and a stable SDK pin. Configure the production Cloud 66
+service to follow `production`; test follows `main`. Coordinate MCP source-code
+promotion separately from SDK dependency updates. For this workflow to control
+deployment timing, do not also configure a direct Cloud 66 push webhook that
+deploys these dependency commits before the workflow calls its hook.
 
 ### Run without Docker
 
@@ -196,7 +227,7 @@ Commit generator/runtime changes and SDK dependency updates rather than generate
 
 ## CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes to `main`
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes to `main` and `production`
 and on every PR: `npm ci` → `build` (codegen + `tsc` from the installed SDK) →
 `lint` ([oxlint](https://oxc.rs/docs/guide/usage/linter)) → `test` ([vitest](https://vitest.dev), specs in
 `test/`). Run the same locally:
