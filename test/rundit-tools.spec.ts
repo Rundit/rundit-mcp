@@ -87,6 +87,39 @@ describe('generated tools over HTTP', () => {
     expect(upstream).toHaveBeenCalledOnce();
   });
 
+  it('exposes avatar preparation and completion with path IDs separated from JSON metadata', async () => {
+    const id = '1d972df2-5c8d-4e82-9b11-40bc08484321';
+    const fileUuid = '5e3030e4-6e9e-4ccb-a6d5-933c29adbb0f';
+    const descriptor = { fileUuid, uploadUrl: 'https://uploads.example.test/image', httpMethod: 'PUT',
+      headers: { 'Content-Type': 'image/png', 'If-None-Match': '*' }, expiresIn: 600, maxBytes: 5242880 };
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify(descriptor), { headers: { 'content-type': 'application/json' } }));
+    const prepared = await request('tools/call', { name: 'profiles_prepare_avatar_upload', arguments: {
+      id, companyId: 17, filename: 'avatar.png', filetype: 'image/png', filesize: 123,
+    } });
+    expect(JSON.parse(prepared.result.content[0].text)).toEqual(descriptor);
+    expect(upstream).toHaveBeenCalledOnce();
+    const [prepareUrl, prepareInit] = upstream.mock.calls[0];
+    expect(prepareUrl).toBe(`http://example.test/api/v2/sdk/profiles/${id}/avatar/uploads`);
+    expect(JSON.parse(prepareInit?.body as string)).toEqual({ companyId: 17, filename: 'avatar.png', filetype: 'image/png', filesize: 123 });
+    upstream.mockReset().mockResolvedValueOnce(new Response(JSON.stringify({ id, avatarImageFileUuid: fileUuid }), { headers: { 'content-type': 'application/json' } }));
+    const completed = await request('tools/call', { name: 'profiles_complete_avatar_upload', arguments: { id, companyId: 17, fileUuid } });
+    expect(completed.result.isError).not.toBe(true);
+    const [completeUrl, completeInit] = upstream.mock.calls[0];
+    expect(completeUrl).toBe(`http://example.test/api/v2/sdk/profiles/${id}/avatar/uploads/complete`);
+    expect(JSON.parse(completeInit?.body as string)).toEqual({ companyId: 17, fileUuid });
+  });
+
+  it('rejects oversized avatars and image bytes in tool arguments before making an API call', async () => {
+    upstream.mockReset();
+    const args = { id: '1d972df2-5c8d-4e82-9b11-40bc08484321', companyId: 17,
+      filename: 'avatar.png', filetype: 'image/png', filesize: 5242881 };
+    for (const input of [args, { ...args, filesize: 123, imageBase64: 'aGVsbG8=' }]) {
+      const result = await request('tools/call', { name: 'profiles_prepare_avatar_upload', arguments: input });
+      expect(result.result.isError).toBe(true);
+      expect(upstream).not.toHaveBeenCalled();
+    }
+  });
+
   it('publishes safety hints for reads, POST-based reads and writes', async () => {
     const response = await request('tools/list');
     for (const name of ['companies_get_all', 'metrics_search', 'metrics_compare', 'metrics_aggregate']) {

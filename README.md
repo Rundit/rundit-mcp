@@ -115,3 +115,17 @@ for each tool's inputs and outputs.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the codegen pipeline, running without
 Docker, and contributor docs.
+
+## Profile avatar uploads
+
+The avatar upload tools use an out-of-band HTTPS transfer:
+
+1. Call `profiles_prepare_avatar_upload` with the existing profile `id`, `companyId`, `filename`, `filetype`, and exact `filesize` in bytes.
+2. The host/agent runtime sends the image's **raw bytes** to the returned `uploadUrl` using `httpMethod` and `headers`. Do not forward Rundit API credentials. The URL allows one write and expires after `expiresIn` seconds.
+3. Call `profiles_complete_avatar_upload` with `id`, `companyId`, and `fileUuid`. It verifies and attaches the image, returning the profile and `avatarImageUrl`.
+
+Supports non-animated JPEG, PNG and WebP, up to 5 MiB and 16 megapixels. Invalid, missing, or incomplete uploads preserve the previous avatar. Completion can be retried for the currently attached upload. To remove an avatar, call `profiles_update` with `avatarImageFileUuid: null`.
+
+These tools exchange metadata and file IDs, not image bytes. They do not automatically access chat attachments, local paths, or files held by another MCP server. The host needs access to the bytes and an HTTPS upload capability; otherwise use the Rundit SDK or a separate upload UI. No experimental MCP file-upload extension is required.
+
+SDK integrations can use `client.profiles.uploadAvatar(id, { companyId, file, filename, filetype })` with a Blob/File or Uint8Array (including Node Buffer) to perform the whole sequence.
