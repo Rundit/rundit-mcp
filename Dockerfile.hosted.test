@@ -26,7 +26,8 @@ COPY package.json package-lock.json ./
 # later `npm prune --omit=dev` reconciles against the lockfile and would roll a
 # --no-save install back to the pinned version. Those manifests live only in
 # this image and describe exactly what got baked.
-RUN echo "==> Target @rundit-sdk/client@rc = $(node -p 'require("/tmp/sdk-tag.json").version')" \
+RUN echo "==> Test SDK image refresh: 2026-10-22" \
+ && echo "==> Target @rundit-sdk/client@rc = $(node -p 'require("/tmp/sdk-tag.json").version')" \
  && npm ci --include=dev --no-audit --no-fund \
  && npm install --include=dev --no-audit --no-fund @rundit-sdk/client@rc \
  && echo "==> Baked @rundit-sdk/client@$(node -p 'require("./node_modules/@rundit-sdk/client/package.json").version')"
