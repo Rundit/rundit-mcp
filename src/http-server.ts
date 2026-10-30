@@ -6,7 +6,9 @@ import {
 } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { RunditToolsService } from './rundit/rundit-tools.service.js';
-import type { RunditService } from './rundit/rundit.service.js';
+import { McpAuthenticationError, type RunditService } from './rundit/rundit.service.js';
+
+import { TOOLS } from './generated/tools.js';
 
 const MCP_PATH = '/mcp';
 // The gateway caps request bodies further out; this is a local backstop since
@@ -30,14 +32,6 @@ type HttpServerDeps = {
   rundit: RunditService;
 };
 
-/**
- * Hosted (remote) transport: MCP over stateless Streamable HTTP.
- *
- * Every POST /mcp must carry a Rundit API key, which is forwarded verbatim to
- * the SDK API on each tool call. Nothing is validated or cached here — an
- * invalid key simply comes back as a 401 from the SDK API inside the tool
- * result. This process holds no secrets and no cross-request state.
- */
 export function startHttpServer({ port, tools, rundit }: HttpServerDeps): Promise<Server> {
   const server = createServer((req, res) => {
     handleRequest(req, res, tools, rundit).catch((err) => {
@@ -73,6 +67,12 @@ async function handleRequest(
 ): Promise<void> {
   const path = new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/+$/, '') || '/';
 
+  if (['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'].includes(path) && process.env.OAUTH_ISSUER) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    sendJson(res, 200, { resource: process.env.OAUTH_RESOURCE, authorization_servers: [process.env.OAUTH_ISSUER], bearer_methods_supported: ['header'], scopes_supported: [...new Set(TOOLS.flatMap(tool => tool.scopes))] });
+    return;
+  }
+
   if (path === '/health') {
     sendJson(res, 200, { status: 'ok' });
     return;
@@ -91,35 +91,41 @@ async function handleRequest(
   if (origin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Expose-Headers', 'WWW-Authenticate');
   }
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-API-Key',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-API-Key, MCP-Protocol-Version',
     });
     res.end();
     return;
   }
 
-  // Stateless mode has no SSE channel and no sessions, so GET and DELETE
-  // (which serve those in stateful deployments) have nothing to do.
+  const credential = extractApiKey(req);
+  const resourceMetadata = process.env.OAUTH_RESOURCE ? `${new URL(process.env.OAUTH_RESOURCE).origin}/.well-known/oauth-protected-resource/mcp` : undefined;
+  const challenge = `Bearer${resourceMetadata ? ` resource_metadata="${resourceMetadata}"` : ''}`;
+  if (!credential) {
+    res.setHeader('WWW-Authenticate', challenge);
+    sendJson(res, 401, jsonRpcError(-32001, 'Connect to Rundit to authorize this application'));
+    return;
+  }
+  let principal: Awaited<ReturnType<RunditService['authenticate']>>;
+  try {
+    principal = await rundit.authenticate(credential, !req.headers.authorization && !!req.headers['x-api-key']);
+  } catch (error) {
+    if (!(error instanceof McpAuthenticationError)) {
+      sendJson(res, 503, jsonRpcError(-32603, 'Authentication service unavailable'));
+      return;
+    }
+    res.setHeader('WWW-Authenticate', `${challenge}${resourceMetadata ? ',' : ''} error="invalid_token"`);
+    sendJson(res, 401, jsonRpcError(-32001, 'Connection expired or revoked. Reconnect to Rundit.'));
+    return;
+  }
+  // Stateless mode does not expose SSE sessions.
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     sendJson(res, 405, jsonRpcError(-32000, 'Method not allowed'));
-    return;
-  }
-
-  const apiKey = extractApiKey(req);
-  if (!apiKey) {
-    res.setHeader('WWW-Authenticate', 'Bearer');
-    sendJson(
-      res,
-      401,
-      jsonRpcError(
-        -32001,
-        'Unauthorized: pass a Rundit API key as "Authorization: Bearer <key>" or "X-API-Key: <key>"',
-      ),
-    );
     return;
   }
 
@@ -144,9 +150,18 @@ async function handleRequest(
     return;
   }
 
-  // Fresh server + transport per request, with the SDK client bound to this
-  // request's API key (the documented stateless pattern).
-  const mcpServer = tools.createServer(rundit.clientFor(apiKey));
+  const call = body as { method?: string; params?: { name?: string } } | null;
+  if (call?.method === 'tools/call' && principal.scopes) {
+    const tool = TOOLS.find(tool => tool.name === call.params?.name);
+    if (tool && tool.scopes.some(scope => !principal.scopes!.includes(scope))) {
+      res.setHeader('WWW-Authenticate', `${challenge}${resourceMetadata ? ',' : ''} error="insufficient_scope", scope="${tool.scopes.join(' ')}"`);
+      sendJson(res, 403, jsonRpcError(-32001, 'This connection does not have the permissions required by this tool'));
+      return;
+    }
+  }
+
+  // A fresh SDK client and transport preserve isolation between connections.
+  const mcpServer = tools.createServer(principal.client, principal.scopes);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

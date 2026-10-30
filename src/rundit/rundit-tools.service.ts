@@ -41,12 +41,13 @@ export class RunditToolsService {
    * client. stdio mode builds one for the process lifetime; http mode builds
    * one per request, bound to that request's API key.
    */
-  createServer(client: RunditClient): McpServer {
+  createServer(client: RunditClient, scopes?: string[]): McpServer {
     const server = new RunditMcpServer({
       name: 'rundit-mcp',
       version: '0.1.0',
     });
-    for (const { spec, inputSchema } of this.tools) {
+    const permitted = this.tools.filter(({ spec }) => !scopes || spec.scopes.every(scope => scopes.includes(scope)));
+    for (const { spec, inputSchema } of permitted) {
       server.registerTool(
         spec.name,
         { description: spec.description, inputSchema, annotations: spec.annotations },
@@ -57,7 +58,7 @@ export class RunditToolsService {
     // callbacks run. Validate the raw arguments here so unknown keys cannot be
     // stripped and all tool failures use the same structured error envelope.
     server.server.setRequestHandler(CallToolRequestSchema, ({ params }) => {
-      const tool = this.tools.find(({ spec }) => spec.name === params.name);
+      const tool = permitted.find(({ spec }) => spec.name === params.name);
       if (!tool) return Promise.resolve(errorResult('NOT_FOUND', `Unknown tool: ${params.name}`, 404));
       return safeCall(() => tool.spec.invoke(client, tool.inputSchema.parse(params.arguments ?? {})));
     });

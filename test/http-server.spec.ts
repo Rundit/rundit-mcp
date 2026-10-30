@@ -13,6 +13,7 @@ let base: string;
 // as an MCP tool error, proving the per-request key pass-through wiring
 // without a live backend.
 const rundit = {
+  authenticate: async (apiKey: string) => ({ client: createClient({ apiKey, baseUrl: 'http://127.0.0.1:9' }) }),
   clientFor: (apiKey: string) => createClient({ apiKey, baseUrl: 'http://127.0.0.1:9' }),
 } as unknown as RunditService;
 
@@ -61,7 +62,7 @@ describe('http transport', () => {
   it('401s without a credential, advertising the Bearer scheme', async () => {
     const res = await mcpPost(TOOLS_LIST);
     expect(res.status).toBe(401);
-    expect(res.headers.get('www-authenticate')).toBe('Bearer');
+    expect(res.headers.get('www-authenticate')).toMatch(/^Bearer/);
   });
 
   it('lists tools with an Authorization bearer key, case-insensitively', async () => {
