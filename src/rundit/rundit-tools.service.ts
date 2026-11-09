@@ -2,7 +2,7 @@ import { STATUS_CODES } from 'node:http';
 import { Injectable } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { RunditSdkError, type RunditClient } from '@rundit-sdk/client';
-import { CallToolRequestSchema, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z, ZodError } from 'zod';
 import { SDK_VERSION, TOOLS, type ToolSpec } from '../generated/tools.js';
@@ -45,7 +45,7 @@ export class RunditToolsService {
     const server = new RunditMcpServer({
       name: 'rundit-mcp',
       version: '0.1.0',
-    });
+    }, { capabilities: { tools: {} } });
     const permitted = this.tools.filter(({ spec }) => !scopes || spec.scopes.every(scope => scopes.includes(scope)));
     for (const { spec, inputSchema } of permitted) {
       server.registerTool(
@@ -54,6 +54,7 @@ export class RunditToolsService {
         (args) => safeCall(() => spec.invoke(client, args)),
       );
     }
+    if (!permitted.length) server.server.setRequestHandler(ListToolsRequestSchema, () => ({ tools: [] }));
     // The SDK's default tool handler turns schema errors into plain text before
     // callbacks run. Validate the raw arguments here so unknown keys cannot be
     // stripped and all tool failures use the same structured error envelope.

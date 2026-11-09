@@ -6,7 +6,7 @@ import {
 } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { RunditToolsService } from './rundit/rundit-tools.service.js';
-import { McpAuthenticationError, type RunditService } from './rundit/rundit.service.js';
+import { McpAuthenticationError, McpAuthenticationServiceError, type RunditService } from './rundit/rundit.service.js';
 
 import { TOOLS } from './generated/tools.js';
 
@@ -67,9 +67,9 @@ async function handleRequest(
 ): Promise<void> {
   const path = new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/+$/, '') || '/';
 
-  if (['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'].includes(path) && process.env.OAUTH_ISSUER) {
+  if (['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'].includes(path) && rundit.oauth) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    sendJson(res, 200, { resource: process.env.OAUTH_RESOURCE, authorization_servers: [process.env.OAUTH_ISSUER], bearer_methods_supported: ['header'], scopes_supported: [...new Set(TOOLS.flatMap(tool => tool.scopes))] });
+    sendJson(res, 200, { resource: rundit.oauth.resource, authorization_servers: [rundit.oauth.issuer], bearer_methods_supported: ['header'], scopes_supported: [...new Set(TOOLS.flatMap(tool => tool.scopes))] });
     return;
   }
 
@@ -103,8 +103,8 @@ async function handleRequest(
   }
 
   const credential = extractApiKey(req);
-  const resourceMetadata = process.env.OAUTH_RESOURCE ? `${new URL(process.env.OAUTH_RESOURCE).origin}/.well-known/oauth-protected-resource/mcp` : undefined;
-  const challenge = `Bearer${resourceMetadata ? ` resource_metadata="${resourceMetadata}"` : ''}`;
+  const resourceMetadata = !!rundit.oauth;
+  const challenge = rundit.oauth?.challenge ?? 'Bearer';
   if (!credential) {
     res.setHeader('WWW-Authenticate', challenge);
     sendJson(res, 401, jsonRpcError(-32001, 'Connect to Rundit to authorize this application'));
@@ -115,6 +115,8 @@ async function handleRequest(
     principal = await rundit.authenticate(credential, !req.headers.authorization && !!req.headers['x-api-key']);
   } catch (error) {
     if (!(error instanceof McpAuthenticationError)) {
+      const reason = error instanceof McpAuthenticationServiceError ? error.reason : 'unexpected';
+      process.stderr.write(`[rundit-mcp] authentication service failure: ${reason}\n`);
       sendJson(res, 503, jsonRpcError(-32603, 'Authentication service unavailable'));
       return;
     }

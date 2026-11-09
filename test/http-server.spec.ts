@@ -1,10 +1,12 @@
 import 'reflect-metadata';
 import { request as httpRequest, type Server } from 'node:http';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createClient } from '@rundit-sdk/client';
+import { readOAuthConfig } from '../src/oauth-config.js';
+import { TOOLS } from '../src/generated/tools.js';
 import { startHttpServer } from '../src/http-server.js';
 import { RunditToolsService } from '../src/rundit/rundit-tools.service.js';
-import type { RunditService } from '../src/rundit/rundit.service.js';
+import { McpAuthenticationError, McpAuthenticationServiceError, type RunditService } from '../src/rundit/rundit.service.js';
 
 let server: Server;
 let base: string;
@@ -13,7 +15,17 @@ let base: string;
 // as an MCP tool error, proving the per-request key pass-through wiring
 // without a live backend.
 const rundit = {
-  authenticate: async (apiKey: string) => ({ client: createClient({ apiKey, baseUrl: 'http://127.0.0.1:9' }) }),
+  oauth: readOAuthConfig(key => ({
+    OAUTH_ISSUER: 'https://auth.example.test/oauth', OAUTH_RESOURCE: 'https://mcp.example.test/mcp',
+    MCP_AUTH_EXCHANGE_URL: 'http://auth-service/oauth/mcp-exchange', OAUTH_EXCHANGE_SECRET: 'test-only'.repeat(8),
+  })[key]),
+  authenticate: async (apiKey: string) => {
+    if (apiKey === 'rejected') throw new McpAuthenticationError();
+    if (apiKey === 'outage') throw new McpAuthenticationServiceError('network');
+    const scopes = apiKey === 'empty' ? [] : apiKey === 'read-only' ? ['companies:read'] :
+      apiKey === 'metrics-only' ? ['metrics:read'] : undefined;
+    return { client: createClient({ apiKey, baseUrl: 'http://127.0.0.1:9' }), scopes };
+  },
   clientFor: (apiKey: string) => createClient({ apiKey, baseUrl: 'http://127.0.0.1:9' }),
 } as unknown as RunditService;
 
@@ -181,5 +193,57 @@ describe('http transport', () => {
     const body = await res.json();
     expect(body.result.isError).toBe(true);
     expect(JSON.parse(body.result.content[0].text).error).toBeTruthy();
+  });
+});
+
+
+describe('OAuth HTTP authorization', () => {
+  it('publishes matching resource discovery and authentication challenges', async () => {
+    const metadata = await (await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)).json();
+    expect(metadata.resource).toBe('https://mcp.example.test/mcp');
+    expect(metadata.authorization_servers).toEqual(['https://auth.example.test/oauth']);
+    const response = await mcpPost(TOOLS_LIST);
+    expect(response.headers.get('www-authenticate')).toContain('resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"');
+  });
+  it('returns invalid_token only for rejected credentials', async () => {
+    const response = await mcpPost(TOOLS_LIST, { Authorization: 'Bearer rejected' });
+    expect(response.status).toBe(401);
+    expect(response.headers.get('www-authenticate')).toContain('error="invalid_token"');
+  });
+  it('reports and logs service outages without asking users to reauthenticate', async () => {
+    const log = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    try {
+      const response = await mcpPost(TOOLS_LIST, { Authorization: 'Bearer outage' });
+      expect(response.status).toBe(503);
+      expect(response.headers.has('www-authenticate')).toBe(false);
+      expect(log).toHaveBeenCalledWith('[rundit-mcp] authentication service failure: network\n');
+    } finally { log.mockRestore(); }
+  });
+  it('isolates filtered tool lists across concurrent grants', async () => {
+    const grants = [['read-only', ['companies:read']], ['metrics-only', ['metrics:read']]] as const;
+    const results = await Promise.all(grants.map(async ([credential, scopes]) => {
+      const response = await mcpPost(TOOLS_LIST, { Authorization: `Bearer ${credential}` });
+      expect(response.status).toBe(200);
+      const names = (await response.json()).result.tools.map((tool: { name: string }) => tool.name);
+      expect(names.sort()).toEqual(TOOLS.filter(tool => tool.scopes.every(scope => (scopes as readonly string[]).includes(scope))).map(tool => tool.name).sort());
+      return names;
+    }));
+    expect(results[0]).not.toEqual(results[1]);
+  });
+  it('supports initialize and an empty tool catalog for empty grants', async () => {
+    const headers = { Authorization: 'Bearer empty' };
+    const init = await mcpPost({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {
+      protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'test', version: '1' },
+    } }, headers);
+    expect(init.status).toBe(200);
+    const response = await mcpPost(TOOLS_LIST, headers);
+    expect(response.status).toBe(200);
+    expect((await response.json()).result.tools).toEqual([]);
+  });
+  it('rejects denied tool calls before invoking the unreachable backend', async () => {
+    const write = TOOLS.find(tool => tool.scopes.some(scope => scope.endsWith(':write')))!;
+    const response = await mcpPost({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: write.name, arguments: {} } }, { Authorization: 'Bearer read-only' });
+    expect(response.status).toBe(403);
+    expect(response.headers.get('www-authenticate')).toContain('error="insufficient_scope"');
   });
 });
