@@ -335,6 +335,14 @@ describe('OAuth HTTP authorization', () => {
 });
 
 describe('credential selection', () => {
+  it('recognizes an API key in the selected Bearer credential', async () => {
+    const response = await mcpPost(TOOLS_LIST, {
+      Authorization: 'Bearer rdt_ten_fake',
+      'X-API-Key': 'ignored-key',
+    });
+    expect(response.status).toBe(200);
+    expect(rundit.authenticate).toHaveBeenLastCalledWith('rdt_ten_fake', true);
+  });
   it.each(['Basic fixture', 'Bearer '])(
     'labels the selected API key correctly with %s Authorization',
     async (authorization) => {

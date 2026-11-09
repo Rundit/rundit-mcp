@@ -246,7 +246,7 @@ function extractCredential(
   const bearer = req.headers.authorization?.match(/^Bearer\s+(.+)$/i);
   if (bearer) {
     const token = bearer[1].trim();
-    if (token) return { value: token, apiKey: false };
+    if (token) return { value: token, apiKey: token.startsWith('rdt_ten_') };
   }
   const apiKeyHeader = req.headers['x-api-key'];
   const apiKey = (
