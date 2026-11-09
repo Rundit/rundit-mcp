@@ -84,6 +84,9 @@ Docker images, or logs. The delegation signing key stays exclusively in the
 backend and must not be provided to this service. Registration and browser sign-in
 require no user-supplied API key or exchange secret.
 
+The private exchange must use its canonical URL: redirects are rejected so
+credentials cannot be forwarded to another destination.
+
 Authentication-service outages and exchange-secret mismatches return 503, with a
 sanitized diagnostic category in stderr. A rejected user credential returns 401;
 insufficient tool permissions return 403. Empty permission sets produce an empty

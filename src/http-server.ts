@@ -6,7 +6,11 @@ import {
 } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { RunditToolsService } from './rundit/rundit-tools.service.js';
-import { McpAuthenticationError, McpAuthenticationServiceError, type RunditService } from './rundit/rundit.service.js';
+import {
+  McpAuthenticationError,
+  McpAuthenticationServiceError,
+  type RunditService,
+} from './rundit/rundit.service.js';
 
 import { TOOLS } from './generated/tools.js';
 
@@ -32,7 +36,11 @@ type HttpServerDeps = {
   rundit: RunditService;
 };
 
-export function startHttpServer({ port, tools, rundit }: HttpServerDeps): Promise<Server> {
+export function startHttpServer({
+  port,
+  tools,
+  rundit,
+}: HttpServerDeps): Promise<Server> {
   const server = createServer((req, res) => {
     handleRequest(req, res, tools, rundit).catch((err) => {
       process.stderr.write(
@@ -50,7 +58,8 @@ export function startHttpServer({ port, tools, rundit }: HttpServerDeps): Promis
     server.once('error', reject);
     server.listen(port, '0.0.0.0', () => {
       const address = server.address();
-      const actualPort = address && typeof address !== 'string' ? address.port : port;
+      const actualPort =
+        address && typeof address !== 'string' ? address.port : port;
       process.stderr.write(
         `[rundit-mcp] http transport listening on :${actualPort} (POST ${MCP_PATH})\n`,
       );
@@ -65,11 +74,24 @@ async function handleRequest(
   tools: RunditToolsService,
   rundit: RunditService,
 ): Promise<void> {
-  const path = new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/+$/, '') || '/';
+  const path =
+    new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/+$/, '') ||
+    '/';
 
-  if (['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'].includes(path) && rundit.oauth) {
+  if (
+    [
+      '/.well-known/oauth-protected-resource',
+      '/.well-known/oauth-protected-resource/mcp',
+    ].includes(path) &&
+    rundit.oauth
+  ) {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    sendJson(res, 200, { resource: rundit.oauth.resource, authorization_servers: [rundit.oauth.issuer], bearer_methods_supported: ['header'], scopes_supported: [...new Set(TOOLS.flatMap(tool => tool.scopes))] });
+    sendJson(res, 200, {
+      resource: rundit.oauth.resource,
+      authorization_servers: [rundit.oauth.issuer],
+      bearer_methods_supported: ['header'],
+      scopes_supported: [...new Set(TOOLS.flatMap((tool) => tool.scopes))],
+    });
     return;
   }
 
@@ -96,32 +118,56 @@ async function handleRequest(
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-API-Key, MCP-Protocol-Version',
+      'Access-Control-Allow-Headers':
+        'Authorization, Content-Type, X-API-Key, MCP-Protocol-Version',
     });
     res.end();
     return;
   }
 
-  const credential = extractApiKey(req);
+  const credential = extractCredential(req);
   const resourceMetadata = !!rundit.oauth;
   const challenge = rundit.oauth?.challenge ?? 'Bearer';
   if (!credential) {
     res.setHeader('WWW-Authenticate', challenge);
-    sendJson(res, 401, jsonRpcError(-32001, 'Connect to Rundit to authorize this application'));
+    sendJson(
+      res,
+      401,
+      jsonRpcError(-32001, 'Connect to Rundit to authorize this application'),
+    );
     return;
   }
   let principal: Awaited<ReturnType<RunditService['authenticate']>>;
   try {
-    principal = await rundit.authenticate(credential, !req.headers.authorization && !!req.headers['x-api-key']);
+    principal = await rundit.authenticate(credential.value, credential.apiKey);
   } catch (error) {
     if (!(error instanceof McpAuthenticationError)) {
-      const reason = error instanceof McpAuthenticationServiceError ? error.reason : 'unexpected';
-      process.stderr.write(`[rundit-mcp] authentication service failure: ${reason}\n`);
-      sendJson(res, 503, jsonRpcError(-32603, 'Authentication service unavailable'));
+      const reason =
+        error instanceof McpAuthenticationServiceError
+          ? error.reason
+          : 'unexpected';
+      process.stderr.write(
+        `[rundit-mcp] authentication service failure: ${reason}\n`,
+      );
+      sendJson(
+        res,
+        503,
+        jsonRpcError(-32603, 'Authentication service unavailable'),
+      );
       return;
     }
-    res.setHeader('WWW-Authenticate', `${challenge}${resourceMetadata ? ',' : ''} error="invalid_token"`);
-    sendJson(res, 401, jsonRpcError(-32001, 'Connection expired or revoked. Reconnect to Rundit.'));
+    res.setHeader(
+      'WWW-Authenticate',
+      `${challenge}${resourceMetadata ? ',' : ''} error="invalid_token"`,
+    );
+    sendJson(
+      res,
+      401,
+      jsonRpcError(
+        -32001,
+        'Connection expired or revoked. Reconnect to Rundit.',
+      ),
+    );
     return;
   }
   // Stateless mode does not expose SSE sessions.
@@ -147,17 +193,34 @@ async function handleRequest(
       drainDeadline.unref();
       req.once('close', () => clearTimeout(drainDeadline));
     } else {
-      sendJson(res, 400, jsonRpcError(-32700, 'Request body is not valid JSON'));
+      sendJson(
+        res,
+        400,
+        jsonRpcError(-32700, 'Request body is not valid JSON'),
+      );
     }
     return;
   }
 
   const call = body as { method?: string; params?: { name?: string } } | null;
   if (call?.method === 'tools/call' && principal.scopes) {
-    const tool = TOOLS.find(tool => tool.name === call.params?.name);
-    if (tool && tool.scopes.some(scope => !principal.scopes!.includes(scope))) {
-      res.setHeader('WWW-Authenticate', `${challenge}${resourceMetadata ? ',' : ''} error="insufficient_scope", scope="${tool.scopes.join(' ')}"`);
-      sendJson(res, 403, jsonRpcError(-32001, 'This connection does not have the permissions required by this tool'));
+    const tool = TOOLS.find((tool) => tool.name === call.params?.name);
+    if (
+      tool &&
+      tool.scopes.some((scope) => !principal.scopes!.includes(scope))
+    ) {
+      res.setHeader(
+        'WWW-Authenticate',
+        `${challenge}${resourceMetadata ? ',' : ''} error="insufficient_scope", scope="${tool.scopes.join(' ')}"`,
+      );
+      sendJson(
+        res,
+        403,
+        jsonRpcError(
+          -32001,
+          'This connection does not have the permissions required by this tool',
+        ),
+      );
       return;
     }
   }
@@ -176,23 +239,29 @@ async function handleRequest(
   await transport.handleRequest(req, res, body);
 }
 
-function extractApiKey(req: IncomingMessage): string | undefined {
+function extractCredential(
+  req: IncomingMessage,
+): { value: string; apiKey: boolean } | undefined {
   // Auth scheme names are case-insensitive (RFC 9110 §11.1).
   const bearer = req.headers.authorization?.match(/^Bearer\s+(.+)$/i);
   if (bearer) {
     const token = bearer[1].trim();
-    if (token) return token;
+    if (token) return { value: token, apiKey: false };
   }
   const apiKeyHeader = req.headers['x-api-key'];
-  const apiKey = (Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader)?.trim();
-  return apiKey || undefined;
+  const apiKey = (
+    Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader
+  )?.trim();
+  return apiKey ? { value: apiKey, apiKey: true } : undefined;
 }
 
 class BodyTooLargeError extends Error {}
 
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const tooLarge = new BodyTooLargeError(`Request body exceeds ${MAX_BODY_BYTES} bytes`);
+    const tooLarge = new BodyTooLargeError(
+      `Request body exceeds ${MAX_BODY_BYTES} bytes`,
+    );
 
     const declaredLength = Number(req.headers['content-length']);
     if (declaredLength > MAX_BODY_BYTES) {
