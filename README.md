@@ -63,6 +63,24 @@ That's it. Everything below is reference.
 To target the test stream, pass both `RUNDIT_SDK_DIST_TAG=rc` and the test
 `RUNDIT_BASE_URL`.
 
+## Hosted image releases
+
+`Dockerfile.hosted.test` installs the SDK from `rc` during the image build;
+`Dockerfile.hosted` installs from `latest`. These images run compiled code and do
+not install dependencies at startup. `RUNDIT_SDK_DIST_TAG` applies only to the
+generic `Dockerfile`, not these hosted images.
+
+Both hosted Dockerfiles fetch npm tag metadata with remote `ADD` before installing
+dependencies. When the tag metadata changes, Docker invalidates that layer and
+rebuilds the install and compilation layers. A container restart alone keeps the
+old SDK: rebuild and deploy the image, then verify the build log's
+`Baked @rundit-sdk/client@<version>` against the intended release.
+
+Publish the SDK with delegation support before deploying OAuth-enabled MCP.
+Update `package.json` and `package-lock.json` to the exact published SDK version
+and pass clean-install CI. The hosted tag must also contain that support;
+updating the lockfile alone does not change what `rc` or `latest` points to.
+
 ## HTTP mode (remote server)
 
 With `MCP_TRANSPORT=http` the same process serves MCP over stateless
