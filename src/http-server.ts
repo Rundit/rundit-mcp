@@ -6,7 +6,13 @@ import {
 } from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { RunditToolsService } from './rundit/rundit-tools.service.js';
-import type { RunditService } from './rundit/rundit.service.js';
+import {
+  McpAuthenticationError,
+  McpAuthenticationServiceError,
+  type RunditService,
+} from './rundit/rundit.service.js';
+
+import { TOOLS } from './generated/tools.js';
 
 const MCP_PATH = '/mcp';
 // The gateway caps request bodies further out; this is a local backstop since
@@ -30,15 +36,11 @@ type HttpServerDeps = {
   rundit: RunditService;
 };
 
-/**
- * Hosted (remote) transport: MCP over stateless Streamable HTTP.
- *
- * Every POST /mcp must carry a Rundit API key, which is forwarded verbatim to
- * the SDK API on each tool call. Nothing is validated or cached here — an
- * invalid key simply comes back as a 401 from the SDK API inside the tool
- * result. This process holds no secrets and no cross-request state.
- */
-export function startHttpServer({ port, tools, rundit }: HttpServerDeps): Promise<Server> {
+export function startHttpServer({
+  port,
+  tools,
+  rundit,
+}: HttpServerDeps): Promise<Server> {
   const server = createServer((req, res) => {
     handleRequest(req, res, tools, rundit).catch((err) => {
       process.stderr.write(
@@ -56,7 +58,8 @@ export function startHttpServer({ port, tools, rundit }: HttpServerDeps): Promis
     server.once('error', reject);
     server.listen(port, '0.0.0.0', () => {
       const address = server.address();
-      const actualPort = address && typeof address !== 'string' ? address.port : port;
+      const actualPort =
+        address && typeof address !== 'string' ? address.port : port;
       process.stderr.write(
         `[rundit-mcp] http transport listening on :${actualPort} (POST ${MCP_PATH})\n`,
       );
@@ -71,7 +74,26 @@ async function handleRequest(
   tools: RunditToolsService,
   rundit: RunditService,
 ): Promise<void> {
-  const path = new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/+$/, '') || '/';
+  const path =
+    new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/+$/, '') ||
+    '/';
+
+  if (
+    [
+      '/.well-known/oauth-protected-resource',
+      '/.well-known/oauth-protected-resource/mcp',
+    ].includes(path) &&
+    rundit.oauth
+  ) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    sendJson(res, 200, {
+      resource: rundit.oauth.resource,
+      authorization_servers: [rundit.oauth.issuer],
+      bearer_methods_supported: ['header'],
+      scopes_supported: [...new Set(TOOLS.flatMap((tool) => tool.scopes))],
+    });
+    return;
+  }
 
   if (path === '/health') {
     sendJson(res, 200, { status: 'ok' });
@@ -91,35 +113,67 @@ async function handleRequest(
   if (origin) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Expose-Headers', 'WWW-Authenticate');
   }
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-API-Key',
+      'Access-Control-Allow-Headers':
+        'Authorization, Content-Type, X-API-Key, MCP-Protocol-Version',
     });
     res.end();
     return;
   }
 
-  // Stateless mode has no SSE channel and no sessions, so GET and DELETE
-  // (which serve those in stateful deployments) have nothing to do.
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    sendJson(res, 405, jsonRpcError(-32000, 'Method not allowed'));
+  const credential = extractCredential(req);
+  const resourceMetadata = !!rundit.oauth;
+  const challenge = rundit.oauth?.challenge ?? 'Bearer';
+  if (!credential) {
+    res.setHeader('WWW-Authenticate', challenge);
+    sendJson(
+      res,
+      401,
+      jsonRpcError(-32001, 'Connect to Rundit to authorize this application'),
+    );
     return;
   }
-
-  const apiKey = extractApiKey(req);
-  if (!apiKey) {
-    res.setHeader('WWW-Authenticate', 'Bearer');
+  let principal: Awaited<ReturnType<RunditService['authenticate']>>;
+  try {
+    principal = await rundit.authenticate(credential.value, credential.apiKey);
+  } catch (error) {
+    if (!(error instanceof McpAuthenticationError)) {
+      const reason =
+        error instanceof McpAuthenticationServiceError
+          ? error.reason
+          : 'unexpected';
+      process.stderr.write(
+        `[rundit-mcp] authentication service failure: ${reason}\n`,
+      );
+      sendJson(
+        res,
+        503,
+        jsonRpcError(-32603, 'Authentication service unavailable'),
+      );
+      return;
+    }
+    res.setHeader(
+      'WWW-Authenticate',
+      `${challenge}${resourceMetadata ? ',' : ''} error="invalid_token"`,
+    );
     sendJson(
       res,
       401,
       jsonRpcError(
         -32001,
-        'Unauthorized: pass a Rundit API key as "Authorization: Bearer <key>" or "X-API-Key: <key>"',
+        'Connection expired or revoked. Reconnect to Rundit.',
       ),
     );
+    return;
+  }
+  // Stateless mode does not expose SSE sessions.
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    sendJson(res, 405, jsonRpcError(-32000, 'Method not allowed'));
     return;
   }
 
@@ -139,14 +193,40 @@ async function handleRequest(
       drainDeadline.unref();
       req.once('close', () => clearTimeout(drainDeadline));
     } else {
-      sendJson(res, 400, jsonRpcError(-32700, 'Request body is not valid JSON'));
+      sendJson(
+        res,
+        400,
+        jsonRpcError(-32700, 'Request body is not valid JSON'),
+      );
     }
     return;
   }
 
-  // Fresh server + transport per request, with the SDK client bound to this
-  // request's API key (the documented stateless pattern).
-  const mcpServer = tools.createServer(rundit.clientFor(apiKey));
+  const call = body as { method?: string; params?: { name?: string } } | null;
+  if (call?.method === 'tools/call' && principal.scopes) {
+    const tool = TOOLS.find((tool) => tool.name === call.params?.name);
+    if (
+      tool &&
+      tool.scopes.some((scope) => !principal.scopes!.includes(scope))
+    ) {
+      res.setHeader(
+        'WWW-Authenticate',
+        `${challenge}${resourceMetadata ? ',' : ''} error="insufficient_scope", scope="${tool.scopes.join(' ')}"`,
+      );
+      sendJson(
+        res,
+        403,
+        jsonRpcError(
+          -32001,
+          'This connection does not have the permissions required by this tool',
+        ),
+      );
+      return;
+    }
+  }
+
+  // A fresh SDK client and transport preserve isolation between connections.
+  const mcpServer = tools.createServer(principal.client, principal.scopes);
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -159,23 +239,29 @@ async function handleRequest(
   await transport.handleRequest(req, res, body);
 }
 
-function extractApiKey(req: IncomingMessage): string | undefined {
+function extractCredential(
+  req: IncomingMessage,
+): { value: string; apiKey: boolean } | undefined {
   // Auth scheme names are case-insensitive (RFC 9110 §11.1).
   const bearer = req.headers.authorization?.match(/^Bearer\s+(.+)$/i);
   if (bearer) {
     const token = bearer[1].trim();
-    if (token) return token;
+    if (token) return { value: token, apiKey: token.startsWith('rdt_ten_') };
   }
   const apiKeyHeader = req.headers['x-api-key'];
-  const apiKey = (Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader)?.trim();
-  return apiKey || undefined;
+  const apiKey = (
+    Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader
+  )?.trim();
+  return apiKey ? { value: apiKey, apiKey: true } : undefined;
 }
 
 class BodyTooLargeError extends Error {}
 
 function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const tooLarge = new BodyTooLargeError(`Request body exceeds ${MAX_BODY_BYTES} bytes`);
+    const tooLarge = new BodyTooLargeError(
+      `Request body exceeds ${MAX_BODY_BYTES} bytes`,
+    );
 
     const declaredLength = Number(req.headers['content-length']);
     if (declaredLength > MAX_BODY_BYTES) {

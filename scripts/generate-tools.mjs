@@ -92,6 +92,7 @@ for (const [path, methods] of Object.entries(openapi.paths)) {
       description: op.description ?? null,
       method: method.toUpperCase(),
       annotations: op['x-mcp-annotations'],
+      scopes: op['x-api-key-scopes'] ?? [],
       path,
       pathParamNames: pathParams.map((p) => p.name),
       hasQuery: queryParams.length > 0,
@@ -134,6 +135,7 @@ out.push(`export const SDK_VERSION = ${JSON.stringify(sdkPkg.version)};`);
 out.push('');
 out.push('export interface ToolSpec {');
 out.push('  name: string;');
+out.push('  scopes: string[];');
 out.push('  description: string;');
 out.push('  annotations: { readOnlyHint: boolean; destructiveHint: boolean };');
 out.push('  inputSchema: {');
@@ -150,6 +152,7 @@ out.push('export const TOOLS: ToolSpec[] = [');
 for (const op of operations) {
   out.push('  {');
   out.push(`    name: ${JSON.stringify(op.name)},`);
+  out.push(`    scopes: ${JSON.stringify(op.scopes)},`);
   out.push(`    description: ${JSON.stringify(describeTool(op))},`);
   const readOnly = ['get', 'list', 'search', 'compare', 'aggregate'].some((prefix) => op.operation.startsWith(prefix));
   out.push(`    annotations: ${JSON.stringify(op.annotations ?? { readOnlyHint: readOnly, destructiveHint: !readOnly })},`);

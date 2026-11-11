@@ -14,6 +14,7 @@ vi.mock('../src/generated/tools.js', async (importOriginal) => {
   const generated = await importOriginal<typeof import('../src/generated/tools.js')>();
   return { ...generated, TOOLS: [...generated.TOOLS, {
     name: 'fixture_write',
+    scopes: [],
     description: 'Test fixture for void writes, independent of the released SDK catalog.',
     annotations: { readOnlyHint: false, destructiveHint: true },
     inputSchema: { type: 'object', properties: {
@@ -32,7 +33,7 @@ let server: Server;
 let url: string;
 
 beforeAll(async () => {
-  server = await startHttpServer({ port: 0, tools: new RunditToolsService(), rundit: { clientFor: () => client } as unknown as RunditService });
+  server = await startHttpServer({ port: 0, tools: new RunditToolsService(), rundit: { authenticate: async () => ({ client }) } as unknown as RunditService });
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('Missing port');
   url = `http://127.0.0.1:${address.port}/mcp`;
