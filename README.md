@@ -63,6 +63,10 @@ That's it. Everything below is reference.
 To target the test stream, pass both `RUNDIT_SDK_DIST_TAG=rc` and the test
 `RUNDIT_BASE_URL`.
 
+In hosted OAuth mode, `RUNDIT_BASE_URL` must use the private backend SDK endpoint.
+The public API gateway strips internal delegation headers. Both hosted Dockerfiles
+default to the private service URL; the public URLs above apply to API-key clients.
+
 ## Hosted image releases
 
 `Dockerfile.hosted.test` installs the SDK from `rc` during the image build;
