@@ -232,6 +232,10 @@ describe('OAuth HTTP authorization', () => {
       await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)
     ).json();
     expect(metadata.resource).toBe('https://mcp.example.test/mcp');
+    // Write scopes must stay discoverable: consent only offers requested scopes.
+    expect(metadata.scopes_supported).toEqual(
+      expect.arrayContaining(['companies:read', 'metrics:write']),
+    );
     expect(metadata.authorization_servers).toEqual([
       'https://auth.example.test/oauth',
     ]);
@@ -239,6 +243,27 @@ describe('OAuth HTTP authorization', () => {
     expect(response.headers.get('www-authenticate')).toContain(
       'resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"',
     );
+  });
+  it('leaves scope selection to resource metadata and prevents caching authorization failures', async () => {
+    const response = await mcpPost(TOOLS_LIST);
+    // A scope here would override scopes_supported for MCP clients and hide write scopes from consent.
+    expect(response.headers.get('www-authenticate')).not.toContain('scope=');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+  it('bounds validation complexity even below the byte-size limit', async () => {
+    const response = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'companies_get_all',
+          arguments: { ids: Array(100_001).fill(0) },
+        },
+      },
+      AUTH,
+    );
+    expect(response.status).toBe(413);
   });
   it('returns invalid_token only for rejected credentials', async () => {
     const response = await mcpPost(TOOLS_LIST, {

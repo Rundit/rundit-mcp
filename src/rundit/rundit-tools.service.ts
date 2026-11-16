@@ -9,6 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { z, ZodError } from 'zod';
+import { MAX_INPUT_ELEMENTS, withinInputLimits } from '../input-limits.js';
 import { SDK_VERSION, TOOLS, type ToolSpec } from '../generated/tools.js';
 import {
   schemaToZodShape,
@@ -55,7 +56,10 @@ export class RunditToolsService {
         name: 'rundit-mcp',
         version: '0.1.0',
       },
-      { capabilities: { tools: {} } },
+      {
+        capabilities: { tools: {} },
+        maxToolInputElements: MAX_INPUT_ELEMENTS,
+      },
     );
     const permitted = this.tools.filter(
       ({ spec }) =>
@@ -80,6 +84,15 @@ export class RunditToolsService {
     // callbacks run. Validate the raw arguments here so unknown keys cannot be
     // stripped and all tool failures use the same structured error envelope.
     server.server.setRequestHandler(CallToolRequestSchema, ({ params }) => {
+      // Our custom handler replaces the SDK's validator, including its budget.
+      if (!withinInputLimits(params.arguments))
+        return Promise.resolve(
+          errorResult(
+            'INVALID_ARGUMENTS',
+            'Tool arguments exceed input complexity limits',
+            422,
+          ),
+        );
       const tool = permitted.find(({ spec }) => spec.name === params.name);
       if (!tool)
         return Promise.resolve(
@@ -238,7 +251,9 @@ function compactErrorBody(
 async function safeCall(fn: () => Promise<unknown>): Promise<ToolResult> {
   try {
     const data = await fn();
-    return { content: [{ type: 'text', text: JSON.stringify(data ?? null) }] };
+    return {
+      content: [{ type: 'text', text: JSON.stringify(data ?? null) }],
+    };
   } catch (err) {
     if (err instanceof ZodError) {
       const seen = new Set<string>();
