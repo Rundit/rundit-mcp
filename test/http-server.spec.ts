@@ -232,6 +232,12 @@ describe('OAuth HTTP authorization', () => {
       await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)
     ).json();
     expect(metadata.resource).toBe('https://mcp.example.test/mcp');
+    expect(metadata.scopes_supported.length).toBeGreaterThan(0);
+    expect(
+      metadata.scopes_supported.every((scope: string) =>
+        scope.endsWith(':read'),
+      ),
+    ).toBe(true);
     expect(metadata.authorization_servers).toEqual([
       'https://auth.example.test/oauth',
     ]);
@@ -239,6 +245,29 @@ describe('OAuth HTTP authorization', () => {
     expect(response.headers.get('www-authenticate')).toContain(
       'resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"',
     );
+  });
+  it('gives read-only scope guidance and prevents caching authorization failures', async () => {
+    const response = await mcpPost(TOOLS_LIST);
+    const challenge = response.headers.get('www-authenticate')!;
+    expect(challenge).toContain('scope="');
+    expect(challenge).toContain('companies:read');
+    expect(challenge).not.toContain(':write');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+  it('bounds validation complexity even below the byte-size limit', async () => {
+    const response = await mcpPost(
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'companies_get_all',
+          arguments: { ids: Array(100_001).fill(0) },
+        },
+      },
+      AUTH,
+    );
+    expect(response.status).toBe(413);
   });
   it('returns invalid_token only for rejected credentials', async () => {
     const response = await mcpPost(TOOLS_LIST, {

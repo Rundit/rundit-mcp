@@ -13,6 +13,7 @@ import {
 } from './rundit/rundit.service.js';
 
 import { TOOLS } from './generated/tools.js';
+import { withinInputLimits } from './input-limits.js';
 
 const MCP_PATH = '/mcp';
 // The gateway caps request bodies further out; this is a local backstop since
@@ -90,7 +91,9 @@ async function handleRequest(
       resource: rundit.oauth.resource,
       authorization_servers: [rundit.oauth.issuer],
       bearer_methods_supported: ['header'],
-      scopes_supported: [...new Set(TOOLS.flatMap((tool) => tool.scopes))],
+      scopes_supported: [
+        ...new Set(TOOLS.flatMap((tool) => tool.scopes)),
+      ].filter((scope) => scope.endsWith(':read')),
     });
     return;
   }
@@ -104,6 +107,8 @@ async function handleRequest(
     sendJson(res, 404, jsonRpcError(-32000, 'Not found'));
     return;
   }
+
+  res.setHeader('Cache-Control', 'no-store');
 
   const origin = req.headers.origin;
   if (origin && !ALLOWED_ORIGINS.has(origin)) {
@@ -119,7 +124,7 @@ async function handleRequest(
     res.writeHead(204, {
       'Access-Control-Allow-Methods': 'POST',
       'Access-Control-Allow-Headers':
-        'Authorization, Content-Type, X-API-Key, MCP-Protocol-Version',
+        'Authorization, Content-Type, X-API-Key, MCP-Protocol-Version, Mcp-Method, Mcp-Name',
     });
     res.end();
     return;
@@ -129,7 +134,13 @@ async function handleRequest(
   const resourceMetadata = !!rundit.oauth;
   const challenge = rundit.oauth?.challenge ?? 'Bearer';
   if (!credential) {
-    res.setHeader('WWW-Authenticate', challenge);
+    const scopes = [...new Set(TOOLS.flatMap((tool) => tool.scopes))]
+      .filter((scope) => scope.endsWith(':read'))
+      .join(' ');
+    res.setHeader(
+      'WWW-Authenticate',
+      resourceMetadata ? `${challenge}, scope="${scopes}"` : challenge,
+    );
     sendJson(
       res,
       401,
@@ -202,7 +213,18 @@ async function handleRequest(
     return;
   }
 
-  const call = body as { method?: string; params?: { name?: string } } | null;
+  const call = body as {
+    method?: string;
+    params?: { name?: string };
+  } | null;
+  if (!withinInputLimits(body)) {
+    sendJson(
+      res,
+      413,
+      jsonRpcError(-32600, 'Request exceeds input complexity limits'),
+    );
+    return;
+  }
   if (call?.method === 'tools/call' && principal.scopes) {
     const tool = TOOLS.find((tool) => tool.name === call.params?.name);
     if (
