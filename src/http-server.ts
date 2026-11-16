@@ -91,9 +91,7 @@ async function handleRequest(
       resource: rundit.oauth.resource,
       authorization_servers: [rundit.oauth.issuer],
       bearer_methods_supported: ['header'],
-      scopes_supported: [
-        ...new Set(TOOLS.flatMap((tool) => tool.scopes)),
-      ].filter((scope) => scope.endsWith(':read')),
+      scopes_supported: [...new Set(TOOLS.flatMap((tool) => tool.scopes))],
     });
     return;
   }
@@ -134,13 +132,7 @@ async function handleRequest(
   const resourceMetadata = !!rundit.oauth;
   const challenge = rundit.oauth?.challenge ?? 'Bearer';
   if (!credential) {
-    const scopes = [...new Set(TOOLS.flatMap((tool) => tool.scopes))]
-      .filter((scope) => scope.endsWith(':read'))
-      .join(' ');
-    res.setHeader(
-      'WWW-Authenticate',
-      resourceMetadata ? `${challenge}, scope="${scopes}"` : challenge,
-    );
+    res.setHeader('WWW-Authenticate', challenge);
     sendJson(
       res,
       401,

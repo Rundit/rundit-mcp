@@ -8,7 +8,10 @@ export function withinInputLimits(value: unknown): boolean {
   function visit(current: unknown, depth: number): boolean {
     if (++elements > MAX_INPUT_ELEMENTS || depth > MAX_INPUT_DEPTH)
       return false;
-    if (current && typeof current === 'object') {
+    // for...in on an array materialises a string key per index before the first iteration.
+    if (Array.isArray(current)) {
+      for (const item of current) if (!visit(item, depth + 1)) return false;
+    } else if (current && typeof current === 'object') {
       for (const key in current) {
         if (
           Object.hasOwn(current, key) &&

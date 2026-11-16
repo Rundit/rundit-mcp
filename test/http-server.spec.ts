@@ -232,12 +232,10 @@ describe('OAuth HTTP authorization', () => {
       await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)
     ).json();
     expect(metadata.resource).toBe('https://mcp.example.test/mcp');
-    expect(metadata.scopes_supported.length).toBeGreaterThan(0);
-    expect(
-      metadata.scopes_supported.every((scope: string) =>
-        scope.endsWith(':read'),
-      ),
-    ).toBe(true);
+    // Write scopes must stay discoverable: consent only offers requested scopes.
+    expect(metadata.scopes_supported).toEqual(
+      expect.arrayContaining(['companies:read', 'metrics:write']),
+    );
     expect(metadata.authorization_servers).toEqual([
       'https://auth.example.test/oauth',
     ]);
@@ -246,12 +244,10 @@ describe('OAuth HTTP authorization', () => {
       'resource_metadata="https://mcp.example.test/.well-known/oauth-protected-resource/mcp"',
     );
   });
-  it('gives read-only scope guidance and prevents caching authorization failures', async () => {
+  it('leaves scope selection to resource metadata and prevents caching authorization failures', async () => {
     const response = await mcpPost(TOOLS_LIST);
-    const challenge = response.headers.get('www-authenticate')!;
-    expect(challenge).toContain('scope="');
-    expect(challenge).toContain('companies:read');
-    expect(challenge).not.toContain(':write');
+    // A scope here would override scopes_supported for MCP clients and hide write scopes from consent.
+    expect(response.headers.get('www-authenticate')).not.toContain('scope=');
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
   it('bounds validation complexity even below the byte-size limit', async () => {
